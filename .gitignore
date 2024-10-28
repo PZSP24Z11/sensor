@@ -1,6 +1,6 @@
 # Ignore RIOT OS directory
-./RIOT
+RIOT
 
 # Ignore development files
-.ccls/
-.ccls-cache/
+.ccls
+.ccls-cache
