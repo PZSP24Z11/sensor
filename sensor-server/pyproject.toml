@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "sensor-server"
+version = "0.1.0"
+description = ""
+authors = [
+    "Łukasz Suchołbiak <sucholbiaklukasz@gmail.com>",
+    "Bartosz Nowak <nowobart@gmail.com>",
+    "Michał Pałasz <michal.palasz12@gmail.com>",
+    "Maciej Scheffer <placeholder@example.com>"
+]
+readme = "README.md"
+packages = [{include = "sensor_server", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.0"
+black = "^24.10.0"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
