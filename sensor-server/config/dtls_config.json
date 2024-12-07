@@ -1,6 +1,7 @@
 {
-    "server-ipv6": "fe80::90a9:19ff:fe06:c849",
-    "server-port": 20220,
+    "server_ipv6": "fe80::90a9:19ff:fe06:c849",
+    "server_port": 20220,
+    "server_iface": "tap0",
     "cert_filepath": "./../cert/server.crt",
-    "key_path": "./../cert/server.key"
+    "key_filepath": "./../cert/server.key"
 }
