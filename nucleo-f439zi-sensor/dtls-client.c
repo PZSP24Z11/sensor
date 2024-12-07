@@ -19,11 +19,6 @@ extern const long ca_der_len;
 static sock_tls_t tls_socket;
 static sock_tls_t *tls_socket_addr = &tls_socket;
 
-static void usage(const char *cmd_name)
-{
-	LOG(LOG_ERROR, "Usage: %s <server address>\n", cmd_name);
-}
-
 int handle_certs(void) {
 
     wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_PEER, NULL);
@@ -50,21 +45,21 @@ int restart_session(void) {
 	return sock_dtls_session_create(tls_socket_addr);
 }
 
-int dtls_client(int argc, char **argv)
+int clean_up(void) {
+	/* Clean up and exit. */
+    LOG(LOG_INFO, "Closing connection.\n");
+    sock_dtls_session_destroy(tls_socket_addr);
+    sock_dtls_close(tls_socket_addr);
+    return 0;
+}
+
+int dtls_client(char *addr_str)
 {
 	int ret = 0;
-	char buf[APP_DTLS_BUF_SIZE] = "Hello from DTLS client!";
 	char *iface;
-	char *addr_str;
 	int connect_timeout = 0;
 	const int max_connect_timeouts = 5;
 
-	if (argc != 2) {
-		usage(argv[0]);
-		return -1;
-	}
-
-	addr_str = argv[1];
 	sock_udp_ep_t local = SOCK_IPV6_EP_ANY;
 	sock_udp_ep_t remote = SOCK_IPV6_EP_ANY;
 
@@ -77,14 +72,12 @@ int dtls_client(int argc, char **argv)
 		gnrc_netif_t *netif = gnrc_netif_get_by_pid(atoi(iface));
 		if (netif == NULL) {
 			LOG(LOG_ERROR, "ERROR: Invalid Interface\n");
-			usage(argv[0]);
 			return -1;
 		}
 		remote.netif = (uint16_t)netif->pid;
 	}
 	if (ipv6_addr_from_str((ipv6_addr_t *)remote.addr.ipv6, addr_str) == NULL) {
 		LOG(LOG_ERROR, "ERROR: Unable to parse destination address\n");
-		usage(argv[0]);
 		return -1;
 	}
 	remote.port = SERVER_PORT;
@@ -129,20 +122,37 @@ int dtls_client(int argc, char **argv)
 	/* set remote endpoint */
     sock_dtls_set_endpoint(tls_socket_addr, &remote);
 
-	/* send hello message */
-	wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
-
-	    /* wait for a reply, indefinitely */
-    do {
-        ret = wolfSSL_read(tls_socket_addr->ssl, buf, APP_DTLS_BUF_SIZE - 1);
-        LOG(LOG_INFO, "wolfSSL_read returned %d\n", ret);
-    } while (ret <= 0);
-    buf[ret] = (char)0;
-    LOG(LOG_INFO, "Received: '%s'\n", buf);
-
-    /* Clean up and exit. */
-    LOG(LOG_INFO, "Closing connection.\n");
-    sock_dtls_session_destroy(tls_socket_addr);
-    sock_dtls_close(tls_socket_addr);
+    LOG(LOG_INFO, "Connection established.\n");
     return 0;
+}
+
+int verify_sensor(void) {
+	int confirmation = 0;
+	int ret = 0;
+	char buf[APP_DTLS_BUF_SIZE] = "SENSORREQ";
+	char buf_acc[11] = "SENSORACC\n";
+	char ack_buf[4] = "ACK";
+
+	/* send sensor request */
+	ret = wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
+	LOG(LOG_INFO, "wolfSSL_write returned with %d\n", ret);
+
+	/* wait for a request accept */
+	while (!confirmation) {
+		do {
+			ret = wolfSSL_read(tls_socket_addr->ssl, buf, APP_DTLS_BUF_SIZE - 1);
+			LOG(LOG_INFO, "wolfSSL_read returned %d\n", ret);
+		} while (ret <= 0);
+		buf[ret] = (char)0;
+		LOG(LOG_INFO, "Received: '%s'\n", buf);
+		LOG(LOG_INFO, "sensoracc buf: '%s'\n", buf_acc);
+		if (!strcmp(buf, buf_acc)) {
+			LOG(LOG_INFO, "Received SENSORACC\nsending ACK\n");
+			confirmation = 1;
+			wolfSSL_write(tls_socket_addr->ssl, ack_buf, strlen(ack_buf));
+		}
+	}
+
+	clean_up();
+	return 0;
 }

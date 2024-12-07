@@ -11,10 +11,13 @@
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-extern int dtls_client(int argc, char **argv);
+extern int dtls_client(char *addr_str);
+extern int start_sensor(int argc, char **argv);
+extern int dtls_client_cmd(int argc, char **argv);
 
 static const shell_command_t shell_commands[] = {
-	{ "dtlsc", "Start a DTLS Client", dtls_client },
+	{ "dtlsc", "Start a DTLS Client", dtls_client_cmd },
+	{ "sensor", "Start the sensor", start_sensor },
 	{ NULL, NULL, NULL }
 };
 
