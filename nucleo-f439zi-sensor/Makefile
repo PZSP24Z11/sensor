@@ -4,7 +4,7 @@ BOARD ?= native
 #BOARD ?= nucleo-f439zi
 #PROGRAMMER ?= cpy2remed
 
-RIOTBASE ?= $(CURDIR)/../../RIOT
+RIOTBASE ?= $(CURDIR)/../RIOT
 
 # GNRC network stack
 USEMODULE += netdev_default

@@ -15,4 +15,4 @@ openssl verify -CAfile ca.crt server.crt
 
 openssl x509 -in ca.crt -outform der -out ca.der
 
-xxd -i ca.der > cert.c
+xxd -i ca.der > ./../nucleo-f439zi-sensor/cert.c
