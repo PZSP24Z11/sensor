@@ -1,3 +1,6 @@
+# ignore certificate file
+cert.c
+
 # ignore compiled binaries
 bin/
 

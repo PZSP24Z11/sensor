@@ -1,5 +1,9 @@
-*.crt
-*.der
+# ignore all keys and certificates
+*.pem
 *.key
-*.srl
 *.csr
+*.der
+*.srl
+
+# ignore any C files (may contain old certificates)
+*.c

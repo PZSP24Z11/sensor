@@ -6,6 +6,6 @@ fi
 SERVER_IP=$1
 
 openssl s_server -dtls1_2 \
-  -key ./../cert/server.key \
-  -cert ./../cert/server.crt \
+  -key ./../../cert/server.key \
+  -cert ./../../cert/server.crt \
   -accept \["$SERVER_IP"]:20220 -msg
