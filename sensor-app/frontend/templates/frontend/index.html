@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Value</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Latest Sensor Value</h1>
+    <p id="valueDisplay">Waiting for data...</p>
+
+    <script>
+        $(document).ready(function() {
+            // Function to fetch the latest sensor value
+            function fetchLatestValue() {
+                $.get("http://localhost:8000/api/last_value/", function(data) {
+                    console.log(data);  // Logs the response from the backend
+                    if (data.value) {
+                        $('#valueDisplay').text("Latest Value: " + data.value);
+                    } else if (data.error) {
+                        $('#valueDisplay').text(data.error);
+                    }
+                }).fail(function(xhr, status, error) {
+                    console.log("Error: ", error);  // Log the error to the console
+                    console.log("Response: ", xhr.responseText);  // Log the response text
+                    $('#valueDisplay').text("Failed to fetch data.");
+                });
+            }
+
+            // Call fetchLatestValue once when the page loads
+            fetchLatestValue();
+
+            // Set an interval to refresh the value every 1 second (1000ms)
+            setInterval(fetchLatestValue, 1000);
+        });
+    </script>
+</body>
+</html>
