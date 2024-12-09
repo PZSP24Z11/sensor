@@ -4,6 +4,7 @@
 *.csr
 *.der
 *.srl
+*.crt
 
 # ignore any C files (may contain old certificates)
 *.c
