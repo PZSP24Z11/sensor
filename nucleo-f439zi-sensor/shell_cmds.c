@@ -2,9 +2,18 @@
 
 #include <sock_tls.h>
 
+#ifndef NUM_READINGS
+  #define NUM_READINGS 2
+#endif
+
+#ifndef READING_LEN
+  #define READING_LEN 5
+#endif
+
 extern int dtls_client(char *addr_str);
 extern int verify_sensor(void);
 extern int clean_up(void);
+extern int send_readings(const char *readings[]);
 
 static void usage_sensor(const char *cmd_name)
 {
@@ -33,9 +42,24 @@ int start_sensor(int argc, char **argv) {
 		return -1;
 	}
 
-	/* ------------------------------------- */
-	/* TODO: PLACE SENSOR READINGS CODE HERE */
-	/* ------------------------------------- */
+	while (true) {
+
+		/* MOCKED SENSOR DATA */
+		char readings[NUM_READINGS][READING_LEN + 1];
+		strncpy(readings[0], "T1234", READING_LEN + 1);
+		strncpy(readings[1], "H0013", READING_LEN + 1);
+		const char *reading_ptrs[NUM_READINGS];
+
+		for (size_t i = 0; i < NUM_READINGS; ++i) {
+			reading_ptrs[i] = readings[i];
+		}
+
+		if (send_readings(reading_ptrs)) {
+			LOG(LOG_ERROR, "ERROR: Unable to send data\n");
+			clean_up();
+			return -1;
+		}
+	}
 	
 	/* Close connection, destroy session */
 	clean_up();
