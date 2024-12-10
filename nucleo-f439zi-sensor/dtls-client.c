@@ -6,12 +6,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "net/gnrc/netif.h"
 #include "log.h"
 
 #define SERVER_PORT 20220
 #define APP_DTLS_BUF_SIZE 64
+
+#ifndef NUM_READINGS
+  #define NUM_READINGS 5
+#endif
+#ifndef READING_LEN
+  #define READING_LEN 5
+#endif
 
 extern const unsigned char ca_der[];
 extern const long ca_der_len;
@@ -153,6 +161,65 @@ int verify_sensor(void) {
 		}
 	}
 
-	clean_up();
+	return 0;
+}
+
+int send_readings(char *readings[]) {
+	uint16_t offset = 0;
+	int16_t ret = 0;
+	uint8_t send = 1;
+	uint8_t ack = 0;
+	char ack_buf[5];
+	char buf[READING_LEN * (NUM_READINGS + 1)];
+	uint8_t timeouts = 0;
+	const uint8_t max_ack_timeouts = 10;
+
+	/* Craft the sensor reading packet */
+	for (size_t i = 0; i < NUM_READINGS; ++i) {
+		strncpy(&buf[offset], readings[i], READING_LEN);
+		offset += READING_LEN;
+		buf[offset] = (i == NUM_READINGS - 1) ? (char)0 : '%';
+		offset ++;
+	}
+
+	LOG(LOG_INFO, "Crafted packet: '%s'\n", buf);
+
+	/* Sending and confirmation handling */
+	do {
+
+		/* send packet */
+		if (send) {
+			ret = wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
+			LOG(LOG_INFO, "Write returned with: %d\n", ret);
+			send = 0;
+		}
+
+		LOG(LOG_INFO, "Awaiting server ACK...\n");
+
+		/* Read into the ack buf */
+		ret = wolfSSL_read(tls_socket_addr->ssl, ack_buf, 4);
+
+		/* Null-terminate, just in case */
+		ack_buf[ret] = (char)0;
+
+		/* Check if ACK or ERR*/
+		if (ret == 4) {
+			if (!strcmp(ack_buf, "ACK\n")) {
+				ack = 1;
+			} else if (!strcmp(ack_buf, "ERR\n")) {
+				LOG(LOG_INFO, "Server reports error with reading!\n");
+				send = 1;
+			}
+		} else {
+			timeouts++;
+			LOG(LOG_INFO, "timeout %d out of %d\n", timeouts, max_ack_timeouts);
+			if (timeouts == max_ack_timeouts) {
+				LOG(LOG_ERROR, "No response from server, timed out!\n");
+				return -1;
+			}
+		}
+	} while (!ack);
+
+	LOG(LOG_INFO, "ACK received\n");
 	return 0;
 }

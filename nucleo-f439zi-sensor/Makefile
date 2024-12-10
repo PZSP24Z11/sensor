@@ -6,6 +6,9 @@ BOARD ?= native
 
 RIOTBASE ?= $(CURDIR)/../RIOT
 
+NUM_READINGS = 2
+READING_LEN = 5
+
 # GNRC network stack
 USEMODULE += netdev_default
 USEMODULE += auto_init_gnrc_netif
@@ -29,6 +32,10 @@ CFLAGS += -DDTLS_DEFAULT_PORT=$(DTLS_PORT) -DDTLS_WOLFSSL -Wno-unused-parameter 
 
 # A larger stack size is required if using ECC or RSA
 CFLAGS += -DTHREAD_STACKSIZE_MAIN=\(4*THREAD_STACKSIZE_DEFAULT\)
+
+# Number of sensor readings
+CFLAGS += -DNUM_READINGS=$(NUM_READINGS)
+CFLAGS += -DREADING_LEN=$(READING_LEN)
 
 DEVELHELP ?= 1
 QUIET ?= 1
