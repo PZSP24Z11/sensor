@@ -45,16 +45,11 @@ int start_sensor(int argc, char **argv) {
 	while (true) {
 
 		/* MOCKED SENSOR DATA */
-		char readings[NUM_READINGS][READING_LEN + 1];
-		strncpy(readings[0], "T1234", READING_LEN + 1);
-		strncpy(readings[1], "H0013", READING_LEN + 1);
-		const char *reading_ptrs[NUM_READINGS];
+		char r1[READING_LEN] = "T1234";
+		char r2[READING_LEN] = "H0013";
+		const char *readings[NUM_READINGS] = {r1, r2};
 
-		for (size_t i = 0; i < NUM_READINGS; ++i) {
-			reading_ptrs[i] = readings[i];
-		}
-
-		if (send_readings(reading_ptrs)) {
+		if (send_readings(readings)) {
 			LOG(LOG_ERROR, "ERROR: Unable to send data\n");
 			clean_up();
 			return -1;
