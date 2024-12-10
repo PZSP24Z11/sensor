@@ -9,22 +9,128 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <unistd.h>
 
 
 #define SERV_PORT   20220
 #define MSGLEN      4096
 
+#define SREQ_LEN    27
+
+// STATES
+#define S_RECVREQ       0
+#define S_CHECK_REG     1
+#define S_SND_SNSACK    2
+
+// 
+#define ES_BAD_REQ_FMT  -1
+
+#define ES_R_FAILED     -21
+#define ES_W_FAILED     -20
+
 static int cleanup;
 struct sockaddr_in6 servAddr;
 struct sockaddr_in6 cliaddr;
 
-void sig_handler(const int sig){
-    printf("\nSIGINT %d handled\n", sig);
-    cleanup = 1;
-    return;
+// void sig_handler(const int sig){
+//     printf("\nSIGINT %d handled\n", sig);
+//     cleanup = 1;
+//     return;
+// }
+
+bool validate_sreq(char sreq[]){
+    return true;
 }
 
+bool sensor_registered_check(char mac[]){
+    return true;
+}
+
+
+int handle_client(WOLFSSL* ssl) {
+    /*
+    1 - recievieng SENSORREQ
+    2 - 
+    */
+    int recv_len     = 0;
+    int state       = 0;
+    int cont        = 1;
+    char            buff[MSGLEN];
+    char            err[] = "ERR";
+    char            sns_ack[] = "SENSORACK";
+
+    while (cont == 1) {
+        switch (state)
+        {
+        case S_RECVREQ:
+            recv_len = wolfSSL_read(ssl, buff, sizeof(buff)-1);
+            
+            if (recv_len < 0){
+                int readErr = wolfSSL_get_error(ssl, 0);
+                if(readErr != SSL_ERROR_WANT_READ) {
+                    state = ES_R_FAILED;
+                }
+            }
+
+            buff[recv_len] = 0;
+            printf("Recieved: \"%s\"\n", buff);
+
+
+            if (recv_len != SREQ_LEN || !validate_sreq(buff)){
+                state = ES_BAD_REQ_FMT;
+                break;
+            }
+
+            state = S_CHECK_REG;
+
+            break;
+        case S_CHECK_REG:
+            if (sensor_registered_check(buff)){
+                state = S_SND_SNSACK;
+            } else {
+                state = ES_BAD_REQ_FMT;
+            }
+            break;
+        
+        case S_SND_SNSACK:
+            if (wolfSSL_write(ssl, sns_ack, sizeof(sns_ack)) < 0){
+                state = ES_W_FAILED;
+            } else {
+                printf("SENSORACK sent succesfully\n");
+                cont = 0;
+            }
+            break;
+
+
+// ERRORS
+        case ES_BAD_REQ_FMT:
+            if (wolfSSL_write(ssl, err, sizeof(err)) < 0) {
+                state = ES_W_FAILED;
+            } else {
+                printf("err msg sent\n");
+                cont = 0;
+            }
+            break;
+
+        case ES_W_FAILED:
+            printf("wolfSSL_write fail\n");
+            cont = 0;
+            break;
+        
+        case ES_R_FAILED:
+            printf("SSL_read failed\n");
+            cont = 0;
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return 0;
+
+}
 
 int main(int argc, char** argv) {
     int             cont = 0;
@@ -46,11 +152,11 @@ int main(int argc, char** argv) {
     char            ack[] = "I hear you fashizzle!\n";
     char            req_msg[] = "SENSORREQ";          
 
-    struct sigaction act, oact;
-    act.sa_handler = sig_handler;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    sigaction(SIGINT, &act, &oact);
+    // struct sigaction act, oact;
+    // act.sa_handler = sig_handler;
+    // sigemptyset(&act.sa_mask);
+    // act.sa_flags = 0;
+    // sigaction(SIGINT, &act, &oact);
 
     // wolfSSL_Debugging_ON();
     wolfSSL_Init();
@@ -108,7 +214,8 @@ int main(int argc, char** argv) {
         }
 
         /*Bind Socket*/
-        if (bind(listenfd, (struct sockaddr*)&servAddr, sizeof(servAddr)) < 0) {
+        res = bind(listenfd, (struct sockaddr*)&servAddr, sizeof(servAddr));
+        if (res < 0) {
             printf("Bind failed.\n");
             cleanup = 1;
             cont = 1;
@@ -157,31 +264,8 @@ int main(int argc, char** argv) {
             printf("SSL_accept failed.\n");
             continue;
         }
-        if ((recvLen = wolfSSL_read(ssl, buff, sizeof(buff)-1)) > 0) {
-            printf("heard %d bytes\n", recvLen);
 
-            buff[recvLen] = 0;
-            printf("I heard this: \"%s\"\n", buff);
-        }
-        else if (recvLen < 0) {
-            int readErr = wolfSSL_get_error(ssl, 0);
-            if(readErr != SSL_ERROR_WANT_READ) {
-                printf("SSL_read failed.\n");
-                cleanup = 1;
-                cont = 1;
-            }
-        }
-        
-        if (wolfSSL_write(ssl, ack, sizeof(ack)) < 0) {
-            printf("wolfSSL_write fail.\n");
-            cleanup = 1;
-            cont = 1;
-        }
-        else {
-            printf("Sending reply.\n");
-        }
-
-        printf("reply sent \"%s\"\n", ack);
+        handle_client(ssl);
 
         wolfSSL_set_fd(ssl, 0);
         wolfSSL_shutdown(ssl);
