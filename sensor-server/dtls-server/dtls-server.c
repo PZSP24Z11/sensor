@@ -1,4 +1,5 @@
 #include <wolfssl/options.h>
+#include <wolfssl/ssl.h>
 #include <stdio.h>                  /* standard in/out procedures */
 #include <stdlib.h>                 /* defines system calls */
 #include <string.h>                 /* necessary for memset */
@@ -6,7 +7,6 @@
 #include <sys/socket.h>             /* used for all socket calls */
 #include <netinet/in.h>             /* used for sockaddr_in6 */
 #include <arpa/inet.h>
-#include <wolfssl/ssl.h>
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
@@ -27,22 +27,24 @@ void sig_handler(const int sig){
 
 
 int main(int argc, char** argv) {
-    int         cont = 0;
-    char        caCertLoc[] = "../cert/ca.crt.pem";
-    char        servCertLoc[] = "../cert/server.crt.pem";
-    char        servKeyLoc[] = "../cert/server.prv.pem";
-    WOLFSSL_CTX* ctx;
-    int           on = 1;
-    int           res = 1;
-    int           connfd = 0;
-    int           recvLen = 0;    /* length of message */
-    int           listenfd = 0;   /* Initialize our socket */
-    WOLFSSL*      ssl = NULL;
-    socklen_t     cliLen;
-    socklen_t     len = sizeof(int);
-    unsigned char b[MSGLEN];      /* watch for incoming messages */
-    char          buff[MSGLEN];   /* the incoming message */
-    char          ack[] = "I hear you fashizzle!\n";
+    int             cont = 0;
+    char            caCertLoc[] = "../../cert/ca.crt.pem";
+    char            servCertLoc[] = "../../cert/server.crt.pem";
+    char            servKeyLoc[] = "../../cert/server.prv.pem";
+    WOLFSSL_CTX*    ctx;
+    int             ret = 0;
+    int             on = 1;
+    int             res = 1;
+    int             connfd = 0;
+    int             recvLen = 0;    /* length of message */
+    int             listenfd = 0;   /* Initialize our socket */
+    WOLFSSL*        ssl = NULL;
+    socklen_t       cliLen;
+    socklen_t       len = sizeof(int);
+    unsigned char   b[MSGLEN];      /* watch for incoming messages */
+    char            buff[MSGLEN];   /* the incoming message */
+    char            ack[] = "I hear you fashizzle!\n";
+    char            req_msg[] = "SENSORREQ";          
 
     struct sigaction act, oact;
     act.sa_handler = sig_handler;
@@ -50,27 +52,30 @@ int main(int argc, char** argv) {
     act.sa_flags = 0;
     sigaction(SIGINT, &act, &oact);
 
+    // wolfSSL_Debugging_ON();
     wolfSSL_Init();
 
-    if ((ctx = wolfSSL_CTX_new(wolfDTLSv1_2_server_method())) == NULL) {
+
+    ctx = wolfSSL_CTX_new(wolfDTLSv1_2_server_method());
+    if (ctx == NULL) {
         printf("wolfSSL_CTX_new error.\n");
         return 1;
     }
     /* Load CA certificates */
-    if (wolfSSL_CTX_load_verify_locations(ctx,caCertLoc,0) !=
-            SSL_SUCCESS) {
+    ret = wolfSSL_CTX_load_verify_locations(ctx,caCertLoc,0);
+    if (ret != SSL_SUCCESS) {
         printf("Error loading %s, please check the file.\n", caCertLoc);
         return 1;
     }
     /* Load server certificates */
-    if (wolfSSL_CTX_use_certificate_file(ctx, servCertLoc, SSL_FILETYPE_PEM) != 
-                                                                 SSL_SUCCESS) {
+    ret = wolfSSL_CTX_use_certificate_file(ctx, servCertLoc, SSL_FILETYPE_PEM);
+    if (ret != SSL_SUCCESS) {
         printf("Error loading %s, please check the file.\n", servCertLoc);
         return 1;
     }
     /* Load server Keys */
-    if (wolfSSL_CTX_use_PrivateKey_file(ctx, servKeyLoc,
-                SSL_FILETYPE_PEM) != SSL_SUCCESS) {
+    ret = wolfSSL_CTX_use_PrivateKey_file(ctx, servKeyLoc, SSL_FILETYPE_PEM);
+    if (ret != SSL_SUCCESS) {
         printf("Error loading %s, please check the file.\n", servKeyLoc);
         return 1;
     }
@@ -79,11 +84,12 @@ int main(int argc, char** argv) {
     while (cleanup != 1) {
 
         /* Create a UDP/IP socket */
-        if ((listenfd = socket(AF_INET6, SOCK_DGRAM, 0)) < 0 ) {
-            printf("Cannot create socket.\n");
+        listenfd = socket(AF_INET6, SOCK_DGRAM, 0);
+        if (listenfd  <= 0 ) {
+            printf("error: cannot create socket.\n");
             cleanup = 1;
         }
-        printf("Socket allocated\n");
+        printf("info: socket allocated\n");
 
         /* clear servAddr each loop */
         memset((char *)&servAddr, 0, sizeof(servAddr));
@@ -165,6 +171,7 @@ int main(int argc, char** argv) {
                 cont = 1;
             }
         }
+        
         if (wolfSSL_write(ssl, ack, sizeof(ack)) < 0) {
             printf("wolfSSL_write fail.\n");
             cleanup = 1;
