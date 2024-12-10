@@ -7,9 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "net/gnrc/netif.h"
 #include "log.h"
+
+#define ERR_TIMEOUT -1
+#define ERR_RESPONSE -2
 
 #define SERVER_PORT 20220
 #define APP_DTLS_BUF_SIZE 64
@@ -21,26 +25,32 @@
   #define READING_LEN 5
 #endif
 
+extern void format_mac(char *buf, uint8_t *addr, uint8_t len);
+extern int format_packet(char *out_buf, uint8_t buf_num, char *bufs[]);
 extern const unsigned char ca_der[];
-extern const long ca_der_len;
+extern const int ca_der_len;
 
+static uint16_t netif_pid;
 static sock_tls_t tls_socket;
 static sock_tls_t *tls_socket_addr = &tls_socket;
 
 int handle_certs(void) {
+	int ret;
 
-    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_PEER, NULL);
+    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
 	LOG(LOG_INFO, "Loading CA cert\n");
+	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
 
-	if (wolfSSL_CTX_load_verify_buffer(
+	ret = wolfSSL_CTX_load_verify_buffer(
             tls_socket_addr->ctx, 
             ca_der,
             ca_der_len,
-            SSL_FILETYPE_ASN1
-        ) != SSL_SUCCESS) {
-        LOG(LOG_ERROR, "Error loading CA certificate\n");
-        return -1;
-    }
+            SSL_FILETYPE_ASN1);
+    if (ret != SSL_SUCCESS) {
+		LOG(LOG_ERROR, "Error loading CA certificate\n");
+		LOG(LOG_ERROR, "Error code: %d\n", ret);
+		return -1;
+	}
 
 	LOG(LOG_INFO, "CA Certificate Loaded\n");
 
@@ -84,6 +94,8 @@ int dtls_client(char *addr_str)
 		}
 		remote.netif = (uint16_t)netif->pid;
 	}
+	netif_pid = remote.netif;
+
 	if (ipv6_addr_from_str((ipv6_addr_t *)remote.addr.ipv6, addr_str) == NULL) {
 		LOG(LOG_ERROR, "ERROR: Unable to parse destination address\n");
 		return -1;
@@ -138,8 +150,25 @@ int verify_sensor(void) {
 	int confirmation = 0;
 	int ret = 0;
 	char buf[APP_DTLS_BUF_SIZE] = "SENSORREQ";
-	char buf_acc[11] = "SENSORACC\n";
+	char req_buf[10] = "SENSORREQ";
 	char ack_buf[4] = "ACK";
+	char type_buf[3] = "TH";
+
+	/* Get MAC address */
+	gnrc_netif_t *netif = gnrc_netif_get_by_pid(netif_pid);
+	uint8_t *mac_addr = netif->l2addr;
+	uint8_t mac_len = netif->l2addr_len;
+	uint8_t mac_buf_len = 3 * mac_len;
+
+	char mac_buf[mac_buf_len];
+	char *bufs[] = {req_buf, mac_buf, type_buf};
+
+	/* format MAC address properly */
+	format_mac(mac_buf, mac_addr, mac_len);
+
+	LOG(LOG_INFO, "MAC ADDRESS: %s\n", mac_buf);
+
+	format_packet(buf, 3, bufs);
 
 	/* send sensor request */
 	ret = wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
@@ -153,8 +182,7 @@ int verify_sensor(void) {
 		} while (ret <= 0);
 		buf[ret] = (char)0;
 		LOG(LOG_INFO, "Received: '%s'\n", buf);
-		LOG(LOG_INFO, "sensoracc buf: '%s'\n", buf_acc);
-		if (!strcmp(buf, buf_acc)) {
+		if (!strcmp(buf, "SENSORACC\n")) {
 			LOG(LOG_INFO, "Received SENSORACC\nsending ACK\n");
 			confirmation = 1;
 			wolfSSL_write(tls_socket_addr->ssl, ack_buf, strlen(ack_buf));
@@ -167,12 +195,14 @@ int verify_sensor(void) {
 int send_readings(char *readings[]) {
 	uint16_t offset = 0;
 	int16_t ret = 0;
-	uint8_t send = 1;
 	uint8_t ack = 0;
 	char ack_buf[5];
 	char buf[READING_LEN * (NUM_READINGS + 1)];
+
+	uint8_t errors = 0;
 	uint8_t timeouts = 0;
 	const uint8_t max_ack_timeouts = 10;
+	const uint8_t max_errors = 3;
 
 	/* Craft the sensor reading packet */
 	for (size_t i = 0; i < NUM_READINGS; ++i) {
@@ -187,36 +217,38 @@ int send_readings(char *readings[]) {
 	/* Sending and confirmation handling */
 	do {
 
-		/* send packet */
-		if (send) {
-			ret = wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
-			LOG(LOG_INFO, "Write returned with: %d\n", ret);
-			send = 0;
-		}
-
+		/* re-send packet every iteration */
+		ret = wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
+		LOG(LOG_INFO, "Sensor readings sent: %d characters\n", ret);
 		LOG(LOG_INFO, "Awaiting server ACK...\n");
 
 		/* Read into the ack buf */
 		ret = wolfSSL_read(tls_socket_addr->ssl, ack_buf, 4);
 
-		/* Null-terminate, just in case */
-		ack_buf[ret] = (char)0;
 
 		/* Check if ACK or ERR*/
-		if (ret == 4) {
+		if (ret >= 4) {
+			/* Null-terminate, just in case */
+			ack_buf[ret] = (char)0;
+
 			if (!strcmp(ack_buf, "ACK\n")) {
 				ack = 1;
 			} else if (!strcmp(ack_buf, "ERR\n")) {
-				LOG(LOG_INFO, "Server reports error with reading!\n");
-				send = 1;
+				errors++;
+				LOG(LOG_WARNING, "Server reports error with reading! (%d/%d)\n", errors, max_errors);
+				if (errors >= max_errors) {
+					LOG(LOG_ERROR, "Too many errors! stopping\n");
+					return ERR_RESPONSE;
+				}
+			}
+		} else if (ret < 0) {
+			timeouts++;
+			if (timeouts == max_ack_timeouts) {
+				LOG(LOG_ERROR, "No response from server, timed out! (%d/%d)\n", timeouts, max_ack_timeouts);
+				return ERR_TIMEOUT;
 			}
 		} else {
-			timeouts++;
-			LOG(LOG_INFO, "timeout %d out of %d\n", timeouts, max_ack_timeouts);
-			if (timeouts == max_ack_timeouts) {
-				LOG(LOG_ERROR, "No response from server, timed out!\n");
-				return -1;
-			}
+			LOG(LOG_WARNING, "Received invalid server response\n");
 		}
 	} while (!ack);
 

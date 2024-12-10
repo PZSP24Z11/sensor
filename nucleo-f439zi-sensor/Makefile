@@ -28,10 +28,12 @@ USEMODULE += wolfssl_dtls
 # Ciphersuit module
 USEMODULE += wolfcrypt_ecc
 
+FEATURES_OPTIONAL += periph_rtc
+
 CFLAGS += -DDTLS_DEFAULT_PORT=$(DTLS_PORT) -DDTLS_WOLFSSL -Wno-unused-parameter -Wno-unused-variable
 
 # A larger stack size is required if using ECC or RSA
-CFLAGS += -DTHREAD_STACKSIZE_MAIN=\(4*THREAD_STACKSIZE_DEFAULT\)
+CFLAGS += -DTHREAD_STACKSIZE_MAIN=\(10*THREAD_STACKSIZE_DEFAULT\)
 
 # Number of sensor readings
 CFLAGS += -DNUM_READINGS=$(NUM_READINGS)
