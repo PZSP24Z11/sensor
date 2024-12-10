@@ -4,3 +4,7 @@ RIOT
 # Ignore development files
 .ccls
 .ccls-cache
+
+
+*.pyc
+__pycache__/
