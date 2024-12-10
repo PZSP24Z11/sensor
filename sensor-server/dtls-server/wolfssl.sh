@@ -8,7 +8,7 @@ cd wolfssl
 ./autogen.sh
 
 # Configure DTLS
-./configure --enable-dtls
+./configure --enable-dtls --enable-ipv6
 
 # Build
 make
