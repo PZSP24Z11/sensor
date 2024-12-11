@@ -1,6 +1,7 @@
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
 #include <stdio.h>                  /* standard in/out procedures */
+#include <curl/curl.h>
 #include <stdlib.h>                 /* defines system calls */
 #include <string.h>                 /* necessary for memset */
 #include <netdb.h>
@@ -13,7 +14,7 @@
 #include <unistd.h>
 
 
-#define SERV_PORT   20221
+#define SERV_PORT   20220
 #define MSGLEN      4096
 
 // STATES
@@ -21,7 +22,7 @@
 #define S_SEND_REQUEST_TO_SERVER    1
 #define S_CHECK_REG                 1 // check if sensor is registered
 #define S_SND_SNSACC                2 // send sensoracc
-#define S_RECVMS                    3 // recieve measurements
+#define S_RECIEVE_MEASUREMENTS      3 // recieve measurements
 #define S_SND_ACK                   4 // send ack
 #define S_SEND_REQUEST_SUBMITED     5
 #define S_DONE                      6 
@@ -29,7 +30,8 @@
 // 
 #define ES_BAD_REQ_FMT  -1
 #define ES_BAD_MS_FMT   -2
-#define ES_API_COMM     -3 // error communicating with API
+#define ES_API_COMM_REQ -3 // error communicating with API
+#define ES_API_COMM_MS  -4 
 
 #define ES_R_FAILED     -21
 #define ES_W_FAILED     -20
@@ -45,6 +47,8 @@
 #define SENSOR_KNOWN            1 // sensor was already registered
 #define SENSOR_REG_SUB          2 // sensor was not registered, register request submitted
 #define BAD_REQUEST             3 // server responed with bad request  
+
+#define MEASUREMENTS_ACCEPTED   2
 
 static int cleanup;
 struct sockaddr_in6 servAddr;
@@ -85,7 +89,7 @@ bool validate_sreq(const char sreq[], int len){
 }
 
 bool validate_measurements(const char ms[], int ms_len){
-    char measurement[MEASUREMENT_DATA_LEN + 1];
+    char measurement[MEASUREMENT_DATA_LEN + 2];
     int i = 0;
 
     if (ms_len < 5)
@@ -100,10 +104,11 @@ bool validate_measurements(const char ms[], int ms_len){
         }
         measurement[j] = 0;
 
+        printf("measurement: %s", measurement);
         if (j != 5 || !isupper(measurement[0]))
             return false;
 
-        for (int k; k <= 4; k++) {
+        for (int k; k <= MEASUREMENT_DATA_LEN; k++) {
             // if (!isdigit(measurement[k]))
             if (!isdigit(measurement[k]) && measurement[k] != '\n') // for development
                 return false;
@@ -116,36 +121,107 @@ bool validate_measurements(const char ms[], int ms_len){
     return true;
 }
 
-bool sensor_registered_check(char mac[]){
-    return true;
-}
-
 bool check_sensor_err(WOLFSSL* ssl) {
     int readErr = wolfSSL_get_error(ssl, 0);
     return readErr != SSL_ERROR_WANT_READ;
 }
 
-int send_req_to_api(char sreq[], int len) {
-    return 1;
+struct MemoryStruct {
+    char *memory;
+    size_t size;
+};
+
+static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    char *ptr = realloc(mem->memory, mem->size + realsize + 1);
+    if(ptr == NULL) {
+        // out of memory!
+        printf("not enough memory (realloc returned NULL)\n");
+        return 0;
+    }
+
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
 }
 
-int send_ms_to_api(char mac[], char ms[], int ms_len) {
-    // for now just mock
-    char msg_to_api[MAC_LEN + ms_len + 2];
-    char ch = SEPARATOR;
+int send_req_to_api(CURL* curl, char sreq[], int len) {
+    CURLcode res;
+    int result = -1;
 
+    struct MemoryStruct chunk;
+    chunk.memory = malloc(1);
+    chunk.size = 0; 
+
+    curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:8000/sensor/register/");
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    printf("sreq: %s\n", sreq);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, sreq);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+    res = curl_easy_perform(curl);
+
+    if(res != CURLE_OK) {
+        fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+    } else {
+        printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
+        printf("Response: %s\n", chunk.memory);
+        result = atoi(chunk.memory);
+        printf("result %d\n", result);
+    }
+
+    free(chunk.memory);
+    return result;
+}
+
+int send_ms_to_api(CURL* curl, char mac[], char ms[], int ms_len) {
+    // for now just mock
+    CURLcode res;
+    int result = -1;
+
+    struct MemoryStruct chunk;
+    chunk.memory = malloc(1);
+    chunk.size = 0; 
+
+    char msg_to_api[MAC_LEN + ms_len + 2];
+    // build message to API
     strncpy(msg_to_api, mac, MAC_LEN);
-    // strncat(mac, &ch, 1);
     msg_to_api[MAC_LEN] = SEPARATOR;
     msg_to_api[MAC_LEN+1] = '\0';
     strncat(msg_to_api, ms, ms_len);
 
     msg_to_api[MAC_LEN + ms_len + 2] = '\0';
     printf("sending measurements to server: %s\n", msg_to_api);
-    return 0;
+
+    curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:8000/sensor/measurements/");
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    printf("msg to api: %s\n", msg_to_api);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, msg_to_api);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+    res = curl_easy_perform(curl);
+
+    if(res != CURLE_OK) {
+        fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+    } else {
+        printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
+        printf("Response: %s\n", chunk.memory);
+        result = atoi(chunk.memory);
+        printf("result %d\n", result);
+    }
+
+    free(chunk.memory);
+    return result;
 }
 
-int handle_client(WOLFSSL* ssl) {
+int handle_client(WOLFSSL* ssl, CURL* curl) {
     int recv_len    = 0;
     int state       = S_RECIEVE_REQUEST;
     int cont        = 1;
@@ -155,6 +231,7 @@ int handle_client(WOLFSSL* ssl) {
     char            ack[] = "ACK";
     char            sns_acc[] = "SENSORACC";
     char            mac[MAC_LEN+1];
+
 
     while (cont) {
         switch (state)
@@ -186,7 +263,7 @@ int handle_client(WOLFSSL* ssl) {
             break;
 
         case S_SEND_REQUEST_TO_SERVER:
-            response = send_req_to_api(buff, recv_len);
+            response = send_req_to_api(curl, buff, recv_len);
 
             switch (response)
             {
@@ -195,9 +272,10 @@ int handle_client(WOLFSSL* ssl) {
                 break;
             case SENSOR_REG_SUB:
                 state = S_SEND_REQUEST_SUBMITED;
+                break;
             case BAD_REQUEST:
             default:
-                state = ES_API_COMM;
+                state = ES_API_COMM_REQ;
                 break;
             }
 
@@ -207,12 +285,12 @@ int handle_client(WOLFSSL* ssl) {
             if (wolfSSL_write(ssl, sns_acc, sizeof(sns_acc)) < 0){
                 state = ES_W_FAILED;
             } else {
-                printf("SENSORACK sent succesfully\n");
-                state = S_RECVMS;
+                printf("SENSORACC sent succesfully\n");
+                state = S_RECIEVE_MEASUREMENTS;
             }
             break;
         
-        case S_RECVMS:
+        case S_RECIEVE_MEASUREMENTS:
             recv_len = wolfSSL_read(ssl, buff, sizeof(buff)-1);
             
             if (recv_len < 0){
@@ -231,8 +309,8 @@ int handle_client(WOLFSSL* ssl) {
 
             if (!validate_measurements(buff, recv_len)) {
                 state = ES_BAD_MS_FMT;
-            } else if (send_ms_to_api(mac, buff, recv_len) != 0){
-                state = ES_API_COMM;
+            } else if (send_ms_to_api(curl, mac, buff, recv_len) != MEASUREMENTS_ACCEPTED){ // 
+                state = ES_API_COMM_MS;
             } else {
                 state = S_SND_ACK;
             }
@@ -243,11 +321,14 @@ int handle_client(WOLFSSL* ssl) {
                 state = ES_W_FAILED;
             } else {
                 printf("ACK sent succesfully\n");
-                state = S_DONE;
+                // state = S_DONE;
+                state = S_RECIEVE_MEASUREMENTS;
             }
             break;
 
         case S_SEND_REQUEST_SUBMITED:
+            state = S_RECIEVE_MEASUREMENTS;
+            break;
             // later to be implemented
 
         case S_DONE:
@@ -259,7 +340,7 @@ int handle_client(WOLFSSL* ssl) {
                 state = ES_W_FAILED;
             } else {
                 printf("bad request format, err msg sent\n");
-                cont = 0;
+                state = ES_BAD_REQ_FMT;
             }
             break;
         
@@ -268,7 +349,7 @@ int handle_client(WOLFSSL* ssl) {
                 state = ES_W_FAILED;
             } else {
                 printf("bad measurement format, err sent\n");
-                cont = 0;
+                state = S_RECIEVE_MEASUREMENTS;
             }
             break;
 
@@ -282,12 +363,18 @@ int handle_client(WOLFSSL* ssl) {
             cont = 0;
             break;
         
-        case ES_API_COMM:
-            printf("Error while communicating with API");
-            cont = 0;
+        case ES_API_COMM_REQ:
+            printf("error while communicating with API - bad request?");
+            state = S_RECIEVE_REQUEST;
+            break;
+
+        case ES_API_COMM_MS:
+            printf("error while communicating with API - bad measurements?");
+            state = S_RECIEVE_MEASUREMENTS;
             break;
 
         default:
+            cont = 0;
             break;
         }
     }
@@ -310,8 +397,17 @@ int main(int argc, char** argv) {
     socklen_t       cliLen;
     socklen_t       len = sizeof(int);
     unsigned char   b[MSGLEN];      /* watch for incoming messages */       
+    CURL*           curl;
 
     wolfSSL_Init();
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
+
+    if (!curl) {
+        fprintf(stderr, "failed to initialize CURL\n");
+        return -1;
+    }
 
 
     ctx = wolfSSL_CTX_new(wolfDTLSv1_2_server_method());
@@ -407,7 +503,12 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        handle_client(ssl);
+
+        
+        handle_client(ssl, curl);
+
+        curl_easy_cleanup(curl);
+        curl_global_cleanup();
 
         wolfSSL_set_fd(ssl, 0);
         wolfSSL_shutdown(ssl);
