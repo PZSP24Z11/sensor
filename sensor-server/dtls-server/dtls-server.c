@@ -35,11 +35,11 @@
 #define ES_W_FAILED     -20
 
 // MESSAGES CONSTANTS
-#define SEPARATOR           '%'
-#define MIN_SREQ_LEN        29
-#define MAX_SREQ_LEN        34
-#define MAC_LEN             17
-#define MEASUREMENT_LEN     4   // measurement length - format eg T1750; - temperature 17.50
+#define SEPARATOR               '%'
+#define MIN_SREQ_LEN            29
+#define MAX_SREQ_LEN            34
+#define MAC_LEN                 17
+#define MEASUREMENT_DATA_LEN     4   // measurement length - format eg T1750; - temperature 17.50
 
 // API COMMUNICATION - responses
 #define SENSOR_KNOWN            1 // sensor was already registered
@@ -51,7 +51,7 @@ struct sockaddr_in6 servAddr;
 struct sockaddr_in6 cliaddr;
 
 
-bool validate_sreq(char sreq[], int len){
+bool validate_sreq(const char sreq[], int len){
     const char *prefix = "SENSORREQ";
     int prefix_len = strlen(prefix);
     int mac_start = prefix_len + 1;
@@ -84,7 +84,35 @@ bool validate_sreq(char sreq[], int len){
     return true;
 }
 
-bool validate_measurements(char ms[], int mslen){
+bool validate_measurements(const char ms[], int ms_len){
+    char measurement[MEASUREMENT_DATA_LEN + 1];
+    int i = 0;
+
+    if (ms_len < 5)
+        return false;
+
+    while (i < ms_len) {
+        int j = 0;
+                
+
+        while (i < ms_len && ms[i] != '%' && j <= MEASUREMENT_DATA_LEN) {
+            measurement[j++] = ms[i++];
+        }
+        measurement[j] = 0;
+
+        if (j != 5 || !isupper(measurement[0]))
+            return false;
+
+        for (int k; k <= 4; k++) {
+            // if (!isdigit(measurement[k]))
+            if (!isdigit(measurement[k]) && measurement[k] != '\n') // for development
+                return false;
+        }
+
+        if (i < ms_len && ms[i] == '%')
+            i++;
+    }
+
     return true;
 }
 
@@ -101,10 +129,19 @@ int send_req_to_api(char sreq[], int len) {
     return 1;
 }
 
-int send_ms_to_api(char msg[], int msg_len) {
+int send_ms_to_api(char mac[], char ms[], int ms_len) {
     // for now just mock
-    msg[msg_len] = '\0';
-    printf("sending measurements to server: %s", msg);
+    char msg_to_api[MAC_LEN + ms_len + 2];
+    char ch = SEPARATOR;
+
+    strncpy(msg_to_api, mac, MAC_LEN);
+    // strncat(mac, &ch, 1);
+    msg_to_api[MAC_LEN] = SEPARATOR;
+    msg_to_api[MAC_LEN+1] = '\0';
+    strncat(msg_to_api, ms, ms_len);
+
+    msg_to_api[MAC_LEN + ms_len + 2] = '\0';
+    printf("sending measurements to server: %s\n", msg_to_api);
     return 0;
 }
 
@@ -185,9 +222,16 @@ int handle_client(WOLFSSL* ssl) {
                 }
             }
 
-            if (!validate_measurements(buff, recv_len)){
+            if (recv_len >= sizeof(buff)){
+                memset(buff, 0, sizeof(buff));
+                printf("Recieved more than buffer size. Recieved: %d", recv_len);
+                state = ES_R_FAILED;
+            }
+            buff[recv_len] = 0;
+
+            if (!validate_measurements(buff, recv_len)) {
                 state = ES_BAD_MS_FMT;
-            } else if (send_ms_to_api(buff, recv_len) != 0){
+            } else if (send_ms_to_api(mac, buff, recv_len) != 0){
                 state = ES_API_COMM;
             } else {
                 state = S_SND_ACK;
@@ -259,9 +303,7 @@ int main(int argc, char** argv) {
     char            servCertLoc[] = "../../cert/server.crt.pem";
     char            servKeyLoc[] = "../../cert/server.prv.pem";
     WOLFSSL_CTX*    ctx;
-    int             ret = 0;
     int             on = 1;
-    int             res = 1;
     int             connfd = 0;
     int             listenfd = 0;   /* Initialize our socket */
     WOLFSSL*        ssl = NULL;
@@ -277,29 +319,23 @@ int main(int argc, char** argv) {
         printf("wolfSSL_CTX_new error.\n");
         return 1;
     }
-    /* Load CA certificates */
-    ret = wolfSSL_CTX_load_verify_locations(ctx,caCertLoc,0);
-    if (ret != SSL_SUCCESS) {
+
+    if (wolfSSL_CTX_load_verify_locations(ctx,caCertLoc,0) != SSL_SUCCESS) {
         printf("Error loading %s, please check the file.\n", caCertLoc);
         return 1;
     }
-    /* Load server certificates */
-    ret = wolfSSL_CTX_use_certificate_file(ctx, servCertLoc, SSL_FILETYPE_PEM);
-    if (ret != SSL_SUCCESS) {
+
+    if (wolfSSL_CTX_use_certificate_file(ctx, servCertLoc, SSL_FILETYPE_PEM) != SSL_SUCCESS) {
         printf("Error loading %s, please check the file.\n", servCertLoc);
         return 1;
     }
-    /* Load server Keys */
-    ret = wolfSSL_CTX_use_PrivateKey_file(ctx, servKeyLoc, SSL_FILETYPE_PEM);
-    if (ret != SSL_SUCCESS) {
+
+    if (wolfSSL_CTX_use_PrivateKey_file(ctx, servKeyLoc, SSL_FILETYPE_PEM) != SSL_SUCCESS) {
         printf("Error loading %s, please check the file.\n", servKeyLoc);
         return 1;
     }
 
-    /* Await Datagram */
     while (cleanup != 1) {
-
-        /* Create a UDP/IP socket */
         listenfd = socket(AF_INET6, SOCK_DGRAM, 0);
         if (listenfd  <= 0 ) {
             printf("error: cannot create socket.\n");
@@ -310,22 +346,18 @@ int main(int argc, char** argv) {
         /* clear servAddr each loop */
         memset((char *)&servAddr, 0, sizeof(servAddr));
 
-        /* host-to-network-long conversion (htonl) */
-        /* host-to-network-short conversion (htons) */
         servAddr.sin6_family      = AF_INET6;
         servAddr.sin6_port        = htons(SERV_PORT);
 
         /* Eliminate socket already in use error */
-        res = setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, len);
-        if (res < 0) {
+        if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, len) < 0) {
             printf("Setsockopt SO_REUSEADDR failed.\n");
             cleanup = 1;
             cont = 1;
         }
 
         /*Bind Socket*/
-        res = bind(listenfd, (struct sockaddr*)&servAddr, sizeof(servAddr));
-        if (res < 0) {
+        if (bind(listenfd, (struct sockaddr*)&servAddr, sizeof(servAddr)) < 0) {
             printf("Bind failed.\n");
             cleanup = 1;
             cont = 1;
