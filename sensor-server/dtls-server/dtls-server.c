@@ -80,8 +80,8 @@ bool validate_sreq(const char sreq[], int len){
     }
 
     for (int i = suffix_start; i < len; i++) {
-        // if (!isupper(sreq[i]))
-        if (!isupper(sreq[i]) && sreq[i] != '\n') // for now - to test working with openssl client
+        if (!isupper(sreq[i]))
+        // if (!isupper(sreq[i]) && sreq[i] != '\n') // for now - to test working with openssl client
             return false;
     }
 
@@ -104,13 +104,13 @@ bool validate_measurements(const char ms[], int ms_len){
         }
         measurement[j] = 0;
 
-        printf("measurement: %s", measurement);
+        printf("measurement: %s\n", measurement);
         if (j != 5 || !isupper(measurement[0]))
             return false;
 
         for (int k; k <= MEASUREMENT_DATA_LEN; k++) {
-            // if (!isdigit(measurement[k]))
-            if (!isdigit(measurement[k]) && measurement[k] != '\n') // for development
+            if (!isdigit(measurement[k]))
+            // if (!isdigit(measurement[k]) && measurement[k] != '\n') // for development
                 return false;
         }
 
