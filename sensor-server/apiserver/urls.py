@@ -17,9 +17,10 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
-from sensors.views import get_last_pomiar
+from sensors.views import get_last_pomiar, sensor_register_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('api/last_value/', get_last_pomiar, name='last_value'),
+    path("api/last_value/", get_last_pomiar, name="last_value"),
+    path("sensor/register/", sensor_register_view, name="sensor_register"),
 ]
