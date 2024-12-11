@@ -1,45 +1,44 @@
 APPLICATION = pzsp2_sensor
-
 BOARD ?= native
-#BOARD ?= nucleo-f439zi
-#PROGRAMMER ?= cpy2remed
-
 RIOTBASE ?= $(CURDIR)/../RIOT
 
+# Constants
+SAMPLE_RATE = 1000
 NUM_READINGS = 2
 READING_LEN = 5
 
-# GNRC network stack
-USEMODULE += netdev_default
-USEMODULE += auto_init_gnrc_netif
-USEMODULE += gnrc_ipv6_default
-USEMODULE += sock_udp
+# development process:
+DEVELHELP = 1
+QUIET ?= 1
 
-# shell
+# Modules to include:
+USEMODULE += sock_udp
 USEMODULE += shell
 USEMODULE += shell_cmds_default
-
-# wolfssl
-USEPKG += wolfssl
+USEMODULE += periph_gpio
+USEMODULE += ztimer_usec
+USEMODULE += ztimer_msec
+USEMODULE += dht
+USEMODULE += pcd8544
+USEMODULE += netdev_default
+USEMODULE += auto_init_gnrc_netif 	# Comment to make LCD working
+USEMODULE += gnrc_ipv6_default
+USEPKG 	  += wolfssl
 USEMODULE += wolfcrypt
 USEMODULE += wolfssl
 USEMODULE += wolfssl_dtls
-
-# Ciphersuit module
 USEMODULE += wolfcrypt_ecc
 
 FEATURES_OPTIONAL += periph_rtc
-
 CFLAGS += -DDTLS_DEFAULT_PORT=$(DTLS_PORT) -DDTLS_WOLFSSL -Wno-unused-parameter -Wno-unused-variable
-
-# A larger stack size is required if using ECC or RSA
 CFLAGS += -DTHREAD_STACKSIZE_MAIN=\(10*THREAD_STACKSIZE_DEFAULT\)
-
-# Number of sensor readings
 CFLAGS += -DNUM_READINGS=$(NUM_READINGS)
 CFLAGS += -DREADING_LEN=$(READING_LEN)
+CFLAGS += -DSAMPLE_RATE=$(SAMPLE_RATE)
 
-DEVELHELP ?= 1
-QUIET ?= 1
+# used without a gpiochip
+ifneq (,$(filter native native64,$(BOARD)))
+ USEMODULE += periph_gpio_mock
+endif
 
 include $(RIOTBASE)/Makefile.include

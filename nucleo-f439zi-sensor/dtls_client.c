@@ -25,6 +25,8 @@
   #define READING_LEN 5
 #endif
 
+#define MAIN_QUEUE_SIZE     (8)
+
 extern void format_mac(char *buf, uint8_t *addr, uint8_t len);
 extern int format_packet(char *out_buf, uint8_t buf_num, char *bufs[]);
 extern const unsigned char ca_der[];
@@ -33,6 +35,7 @@ extern const int ca_der_len;
 static uint16_t netif_pid;
 static sock_tls_t tls_socket;
 static sock_tls_t *tls_socket_addr = &tls_socket;
+static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int handle_certs(void) {
 	int ret;
@@ -253,5 +256,25 @@ int send_readings(char *readings[]) {
 	} while (!ack);
 
 	LOG(LOG_INFO, "ACK received\n");
+	return 0;
+}
+
+int initialize_dtls(char* ip)
+{
+	msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
+	wolfSSL_Init();
+	wolfSSL_Debugging_ON();
+
+	if (dtls_client(ip)) {
+		LOG(LOG_ERROR, "ERROR: dtls_client failed, exitting...\n");
+		return -1;
+	}
+
+	if (verify_sensor()) {
+		LOG(LOG_ERROR, "ERROR: Sensor not accepted by host, exitting...\n");
+		clean_up();
+		return -1;
+	}
+	
 	return 0;
 }

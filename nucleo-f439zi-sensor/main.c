@@ -1,38 +1,55 @@
-#include <wolfssl/ssl.h>
-
 #include "shell.h"
-#include "msg.h"
+#include "ztimer.h"
 #include "log.h"
 
-#ifdef WITH_RIOT_SOCKETS
-#error RIOT-OS is set to use sockets but this DTLS app is configured for socks.
-#endif
+bool MOCK_MODE = true;
 
-#define MAIN_QUEUE_SIZE     (8)
-static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+int16_t hum = 0;
+int16_t temp = 0;
 
-extern int dtls_client(char *addr_str);
-extern int start_sensor(int argc, char **argv);
-extern int dtls_client_cmd(int argc, char **argv);
+extern void initialize_sensor(void);
+extern void initialize_lcd(void);
+extern int initialize_dtls(char* ip);
+extern void start_gather_measurements_thread(void);
+extern void start_mock_measurements_thread(void);
+extern void start_gpio_loop_thread(void);
+
+int start_sensor(int argc, char **argv) {
+
+	if (argc != 2) {
+		LOG(LOG_ERROR, "Usage: %s <server address>\n", argv[0]);
+		return -1;
+	}
+
+	initialize_dtls(argv[1]);
+
+    if(MOCK_MODE)
+    {
+        start_mock_measurements_thread();
+    }
+    else
+    {
+        initialize_sensor();
+        initialize_lcd();
+
+        start_gather_measurements_thread();
+        start_gpio_loop_thread();
+    }
+
+	return 0;
+}
 
 static const shell_command_t shell_commands[] = {
-	{ "dtlsc", "Start a DTLS Client", dtls_client_cmd },
 	{ "sensor", "Start the sensor", start_sensor },
 	{ NULL, NULL, NULL }
 };
 
-
 int main(void)
 {
-	msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
-	LOG(LOG_INFO, "RIOT wolfSSL DTLS client\n");
-	wolfSSL_Init();
-	wolfSSL_Debugging_ON();
-
-	/* start shell */
+    LOG(LOG_INFO, "--- Starting Senosr App ---\n");
+    LOG(LOG_INFO, "sensor <serwer-ip-address>: start app\n");
 	LOG(LOG_INFO, "All up, running the shell now\n");
 	char line_buf[SHELL_DEFAULT_BUFSIZE];
 	shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
-
-	return 0;
+    return 0;
 }

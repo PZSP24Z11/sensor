@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "ssl.h": "c",
+        "thread.h": "c",
+        "shell.h": "c",
+        "dht_params.h": "c",
+        "led.h": "c",
+        "pcd8544.h": "c",
+        "gpio.h": "c",
+        "ztimer.h": "c",
+        "msg.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "log.h": "c",
+        "error-ssl.h": "c",
+        "sstream": "c"
+    }
+}
