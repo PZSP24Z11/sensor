@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from .models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru
 from django.views.decorators.csrf import csrf_exempt
 import re
@@ -26,7 +26,7 @@ def sensor_register_view(request):
             match = re.match(r"SENSORREQ%([a-fA-F0-9:]+)%([A-Za-z]*)", data)
 
             if not match:
-                return JsonResponse({"status": 3, "message": "Invalid data format"}, status=400)
+                return HttpResponse("3")
 
             random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
             current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -43,7 +43,7 @@ def sensor_register_view(request):
                     if full_name:
                         measurement_type, _ = TypPomiaru.objects.get_or_create(nazwa_pomiaru=full_name)
                         SensorTypPomiaru.objects.create(sensor=sensor, typ_pomiaru=measurement_type)
-                return JsonResponse({"status": 2, "message": "Sensor registered"})
+                return HttpResponse("2")
 
             for measurement in measurement_types:
                 full_name = type_map.get(measurement.upper())
@@ -51,12 +51,12 @@ def sensor_register_view(request):
                     measurement_type, _ = TypPomiaru.objects.get_or_create(nazwa_pomiaru=full_name)
                     SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
 
-            return JsonResponse({"status": 1, "message": "Sensor already exists"})
+            return HttpResponse("1")
 
         except Exception as e:
-            return JsonResponse({"status": 3, "message": "An error occurred", "error": str(e)}, status=500)
+            return HttpResponse("3")
 
-    return JsonResponse({"status": 3, "message": "Method not allowed"}, status=405)
+    return HttpResponse("3")
 
 
 @csrf_exempt
@@ -67,7 +67,7 @@ def measurements_register_view(request):
 
             match = re.match(r"([a-fA-F0-9:]+)%((?:[A-Za-z]\d+%?)+)", data)
             if not match:
-                return JsonResponse({"status": 3, "message": "Invalid data format"}, status=400)
+                return HttpResponse("3")
 
             mac_address = match.group(1)
             measurements = match.group(2)
@@ -75,25 +75,22 @@ def measurements_register_view(request):
             try:
                 sensor = Sensor.objects.get(adres_MAC=mac_address)
             except Sensor.DoesNotExist:
-                return JsonResponse({"status": 3, "message": "Sensor not registered"}, status=404)
+                return HttpResponse("3")
 
             measurements_data = re.findall(r"([A-Za-z])(\d+)", measurements)
             for measurement_type, value in measurements_data:
                 full_name = type_map.get(measurement_type.upper())
                 if not full_name:
-                    return JsonResponse(
-                        {"status": 3, "message": f"Measurement type '{measurement_type}' not recognized"},
-                        status=400,
-                    )
+                    return HttpResponse("3")
 
                 try:
                     measurement_type_obj = TypPomiaru.objects.get(nazwa_pomiaru=full_name)
                 except TypPomiaru.DoesNotExist:
-                    return JsonResponse(
-                        {"status": 3, "message": f"Measurement type '{full_name}' not found in the database"},
-                        status=400,
-                    )
+                    return HttpResponse("3")
 
+                is_allowed = SensorTypPomiaru.objects.filter(sensor=sensor, typ_pomiaru=measurement_type_obj).exists()
+                if not is_allowed:
+                    return HttpResponse("3")
                 Pomiar.objects.create(
                     sensor=sensor,
                     typ_pomiaru=measurement_type_obj,
@@ -101,9 +98,9 @@ def measurements_register_view(request):
                     data_pomiaru=datetime.now(),
                 )
 
-            return JsonResponse({"status": 2, "message": "Measurements registered"})
+            return HttpResponse("2")
 
-        except Exception as e:
-            return JsonResponse({"status": 3, "message": "An error occurred", "error": str(e)}, status=500)
+        except Exception:
+            return HttpResponse("3")
 
-    return JsonResponse({"status": 3, "message": "Method not allowed"}, status=405)
+    return HttpResponse("3")
