@@ -1,7 +1,8 @@
 from django.http import JsonResponse
 from .models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru
-import re
 from django.views.decorators.csrf import csrf_exempt
+import re, string, random
+from datetime import datetime
 
 
 def get_last_pomiar(request):
@@ -18,14 +19,17 @@ def sensor_register_view(request):
         try:
             data = request.body.decode("utf-8")
 
-            match = re.match(r"([A-Za-z0-9_-]+)%([a-fA-F0-9:]+)%([A-Za-z]*)", data)
+            match = re.match(r"SENSORREQ%([a-fA-F0-9:]+)%([A-Za-z]*)", data)
 
             if not match:
                 return JsonResponse({"status": 3, "message": "Invalid data format"}, status=400)
 
-            name = match.group(1)
-            mac_address = match.group(2)
-            measurement_types = match.group(3)
+            random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
+            current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+            name = f"{random_chars}_{current_datetime}"
+            mac_address = match.group(1)
+            measurement_types = match.group(2)
 
             type_map = {"T": "Temperatura", "W": "Wilgotnosc"}
 
