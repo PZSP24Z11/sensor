@@ -254,6 +254,7 @@ int initialize_dtls(char* ip)
 	msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 	wolfSSL_Init();
 	wolfSSL_Debugging_ON();
+	LOG(LOG_INFO, "DTLS Init complete\n");
 
 	if (dtls_client(ip)) {
 		LOG(LOG_ERROR, "ERROR: dtls_client failed, exitting...\n");

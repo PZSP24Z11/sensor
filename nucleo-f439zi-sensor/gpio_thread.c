@@ -16,7 +16,7 @@
 #define LCD_MODE            (GPIO_PIN(1, 2))  // PB2 *
 #define LCD_DIN             (GPIO_PIN(0, 7))  // PA7
 #define LCD_CLK             (GPIO_PIN(0, 5))  // PA5
-#define SPI_INTERFACE       (0)
+#define SPI_INTERFACE       (SPI_DEV(0))
 
 pcd8544_t lcd_device;
 extern int16_t hum;
@@ -56,6 +56,7 @@ void start_gpio_loop_thread(void)
 
 void initialize_lcd(void)
 {
+	printf("test\n");
     LOG(LOG_INFO, "Initializing LCD... \n");
     if (pcd8544_init(&lcd_device, SPI_INTERFACE, LCD_CS, LCD_RESET, LCD_MODE) == 0) {
         LOG(LOG_INFO, "LCD initialized\n");
