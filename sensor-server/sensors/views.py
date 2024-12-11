@@ -28,16 +28,23 @@ def sensor_register_view(request):
             if not match:
                 return HttpResponse("3")
 
-            random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
-            current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-            name = f"{random_chars}_{current_datetime}"
             mac_address = match.group(1)
             measurement_types = match.group(2)
 
-            sensor, created_sensor = Sensor.objects.get_or_create(nazwa_sensora=name, adres_MAC=mac_address)
+            try:
+                sensor = Sensor.objects.get(adres_MAC=mac_address)
+                for measurement in measurement_types:
+                    full_name = type_map.get(measurement.upper())
+                    if full_name:
+                        measurement_type, _ = TypPomiaru.objects.get_or_create(nazwa_pomiaru=full_name)
+                        SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
+                return HttpResponse("1")
+            except Sensor.DoesNotExist:
+                random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
+                current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                name = f"{random_chars}_{current_datetime}"
 
-            if created_sensor:
+                sensor = Sensor.objects.create(nazwa_sensora=name, adres_MAC=mac_address)
                 for measurement in measurement_types:
                     full_name = type_map.get(measurement.upper())
                     if full_name:
@@ -45,15 +52,7 @@ def sensor_register_view(request):
                         SensorTypPomiaru.objects.create(sensor=sensor, typ_pomiaru=measurement_type)
                 return HttpResponse("2")
 
-            for measurement in measurement_types:
-                full_name = type_map.get(measurement.upper())
-                if full_name:
-                    measurement_type, _ = TypPomiaru.objects.get_or_create(nazwa_pomiaru=full_name)
-                    SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
-
-            return HttpResponse("1")
-
-        except Exception as e:
+        except Exception:
             return HttpResponse("3")
 
     return HttpResponse("3")
