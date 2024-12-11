@@ -17,12 +17,14 @@
 #define MSGLEN      4096
 
 // STATES
-#define S_RECVREQ       0 // recieve sensor request
-#define S_CHECK_REG     1 // check if sensor is registered
-#define S_SND_SNSACK    2 // send sensorack
-#define S_RECVMS        3 // recieve measurements
-#define S_SND_ACK       4 // send ack
-#define S_DONE          5 
+#define S_RECIEVE_REQUEST           0 // recieve sensor request
+#define S_SEND_REQUEST_TO_SERVER    1
+#define S_CHECK_REG                 1 // check if sensor is registered
+#define S_SND_SNSACC                2 // send sensoracc
+#define S_RECVMS                    3 // recieve measurements
+#define S_SND_ACK                   4 // send ack
+#define S_SEND_REQUEST_SUBMITED     5
+#define S_DONE                      6 
 
 // 
 #define ES_BAD_REQ_FMT  -1
@@ -38,6 +40,11 @@
 #define MAX_SREQ_LEN        34
 #define MAC_LEN             17
 #define MEASUREMENT_LEN     4   // measurement length - format eg T1750; - temperature 17.50
+
+// API COMMUNICATION - responses
+#define SENSOR_KNOWN            1 // sensor was already registered
+#define SENSOR_REG_SUB          2 // sensor was not registered, register request submitted
+#define BAD_REQUEST             3 // server responed with bad request  
 
 static int cleanup;
 struct sockaddr_in6 servAddr;
@@ -85,12 +92,16 @@ bool sensor_registered_check(char mac[]){
     return true;
 }
 
-bool check_sensor_err(WOLFSSL* ssl){
+bool check_sensor_err(WOLFSSL* ssl) {
     int readErr = wolfSSL_get_error(ssl, 0);
     return readErr != SSL_ERROR_WANT_READ;
 }
 
-int send_to_api(char msg[], int msg_len) {
+int send_req_to_api(char sreq[], int len) {
+    return 1;
+}
+
+int send_ms_to_api(char msg[], int msg_len) {
     // for now just mock
     msg[msg_len] = '\0';
     printf("sending measurements to server: %s", msg);
@@ -98,28 +109,25 @@ int send_to_api(char msg[], int msg_len) {
 }
 
 int handle_client(WOLFSSL* ssl) {
-    /*
-    1 - recievieng SENSORREQ
-    2 - 
-    */
     int recv_len    = 0;
-    int state       = 0;
+    int state       = S_RECIEVE_REQUEST;
     int cont        = 1;
+    int response    = 0;
     char            buff[MSGLEN];
     char            err[] = "ERR";
     char            ack[] = "ACK";
     char            sns_acc[] = "SENSORACC";
     char            mac[MAC_LEN+1];
 
-    while (cont == 1) {
+    while (cont) {
         switch (state)
         {
-        case S_RECVREQ:
+        case S_RECIEVE_REQUEST:
             recv_len = wolfSSL_read(ssl, buff, sizeof(buff)-1);
             
             if (recv_len < 0){
-                int readErr = wolfSSL_get_error(ssl, 0);
-                if(readErr != SSL_ERROR_WANT_READ && check_sensor_err(ssl)) {
+                int read_err = wolfSSL_get_error(ssl, 0);
+                if(read_err != SSL_ERROR_WANT_READ && check_sensor_err(ssl)) {
                     state = ES_R_FAILED;
                 }
             }
@@ -137,18 +145,28 @@ int handle_client(WOLFSSL* ssl) {
             printf("MAC: %s\n", mac);
 
 
-            state = S_CHECK_REG;
+            state = S_SEND_REQUEST_TO_SERVER;
             break;
 
-        case S_CHECK_REG:
-            if (sensor_registered_check(buff)){
-                state = S_SND_SNSACK;
-            } else {
-                state = ES_BAD_REQ_FMT;
+        case S_SEND_REQUEST_TO_SERVER:
+            response = send_req_to_api(buff, recv_len);
+
+            switch (response)
+            {
+            case SENSOR_KNOWN:
+                state = S_SND_SNSACC;
+                break;
+            case SENSOR_REG_SUB:
+                state = S_SEND_REQUEST_SUBMITED;
+            case BAD_REQUEST:
+            default:
+                state = ES_API_COMM;
+                break;
             }
+
             break;
         
-        case S_SND_SNSACK:
+        case S_SND_SNSACC:
             if (wolfSSL_write(ssl, sns_acc, sizeof(sns_acc)) < 0){
                 state = ES_W_FAILED;
             } else {
@@ -161,15 +179,15 @@ int handle_client(WOLFSSL* ssl) {
             recv_len = wolfSSL_read(ssl, buff, sizeof(buff)-1);
             
             if (recv_len < 0){
-                int readErr = wolfSSL_get_error(ssl, 0);
-                if(readErr != SSL_ERROR_WANT_READ && check_sensor_err(ssl)) {
+                int read_err = wolfSSL_get_error(ssl, 0);
+                if(read_err != SSL_ERROR_WANT_READ && check_sensor_err(ssl)) {
                     state = ES_R_FAILED;
                 }
             }
 
             if (!validate_measurements(buff, recv_len)){
                 state = ES_BAD_MS_FMT;
-            } else if (send_to_api(buff, recv_len) != 0){
+            } else if (send_ms_to_api(buff, recv_len) != 0){
                 state = ES_API_COMM;
             } else {
                 state = S_SND_ACK;
@@ -182,10 +200,15 @@ int handle_client(WOLFSSL* ssl) {
             } else {
                 printf("ACK sent succesfully\n");
                 state = S_DONE;
-                cont = 0;
             }
             break;
 
+        case S_SEND_REQUEST_SUBMITED:
+            // later to be implemented
+
+        case S_DONE:
+            cont = 0;
+            break;
 // ERRORS
         case ES_BAD_REQ_FMT:
             if (wolfSSL_write(ssl, err, sizeof(err)) < 0) {
@@ -229,6 +252,7 @@ int handle_client(WOLFSSL* ssl) {
 
 }
 
+
 int main(int argc, char** argv) {
     int             cont = 0;
     char            caCertLoc[] = "../../cert/ca.crt.pem";
@@ -239,7 +263,6 @@ int main(int argc, char** argv) {
     int             on = 1;
     int             res = 1;
     int             connfd = 0;
-    int             recvLen = 0;    /* length of message */
     int             listenfd = 0;   /* Initialize our socket */
     WOLFSSL*        ssl = NULL;
     socklen_t       cliLen;
