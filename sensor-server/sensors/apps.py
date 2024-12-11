@@ -8,7 +8,7 @@ class SensorsConfig(AppConfig):
     def ready(self):
         from .models import TypPomiaru
 
-        default_types = ["Temperatura", "Wilgotnosc"]
+        default_types = ["Temperature", "Humidity"]
 
         for typ in default_types:
             TypPomiaru.objects.get_or_create(nazwa_pomiaru=typ)
