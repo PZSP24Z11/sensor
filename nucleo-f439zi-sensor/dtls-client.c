@@ -182,10 +182,8 @@ int verify_sensor(void) {
 		} while (ret <= 0);
 		buf[ret] = (char)0;
 		LOG(LOG_INFO, "Received: '%s'\n", buf);
-		if (!strcmp(buf, "SENSORACC\n")) {
-			LOG(LOG_INFO, "Received SENSORACC\nsending ACK\n");
+		if (!strcmp(buf, "SENSORACC")) {
 			confirmation = 1;
-			wolfSSL_write(tls_socket_addr->ssl, ack_buf, strlen(ack_buf));
 		}
 	}
 
@@ -223,9 +221,9 @@ int send_readings(char *readings[]) {
 			/* Null-terminate, just in case */
 			ack_buf[ret] = (char)0;
 
-			if (!strcmp(ack_buf, "ACK\n")) {
+			if (!strcmp(ack_buf, "ACK")) {
 				ack = 1;
-			} else if (!strcmp(ack_buf, "ERR\n")) {
+			} else if (!strcmp(ack_buf, "ERR")) {
 				errors++;
 				LOG(LOG_WARNING, "Server reports error with reading! (%d/%d)\n", errors, max_errors);
 				if (errors >= max_errors) {

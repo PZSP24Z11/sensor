@@ -271,7 +271,8 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
                 state = S_SND_SNSACC;
                 break;
             case SENSOR_REG_SUB:
-                state = S_SEND_REQUEST_SUBMITED;
+				// state = S_SEND_REQUEST_SUBMITED;
+				state = S_SND_SNSACC;
                 break;
             case BAD_REQUEST:
             default:
