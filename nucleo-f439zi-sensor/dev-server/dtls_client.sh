@@ -7,5 +7,5 @@ SERVER_IP=$1
 
 openssl s_client -dtls1_2 \
   -CAfile ./../../cert/ca.crt.pem \
-  -connect \["$SERVER_IP"]:20220 \
+  -connect \["$SERVER_IP"]:20221 \
   -msg

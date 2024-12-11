@@ -33,18 +33,47 @@
 #define ES_W_FAILED     -20
 
 // MESSAGES CONSTANTS
-#define MAIN_SEPARATOR      '%'
-#define SREQ_LEN            27
+#define SEPARATOR           '%'
+#define MIN_SREQ_LEN        29
+#define MAX_SREQ_LEN        34
 #define MAC_LEN             17
-#define MS_LEN              6   // measurement length - format eg T1750; - temperature 17.50
-#define MS_SEPARATOR        ';'
+#define MEASUREMENT_LEN     4   // measurement length - format eg T1750; - temperature 17.50
 
 static int cleanup;
 struct sockaddr_in6 servAddr;
 struct sockaddr_in6 cliaddr;
 
 
-bool validate_sreq(char sreq[]){
+bool validate_sreq(char sreq[], int len){
+    const char *prefix = "SENSORREQ";
+    int prefix_len = strlen(prefix);
+    int mac_start = prefix_len + 1;
+    int suffix_start = mac_start + MAC_LEN + 1;
+
+    if (memcmp(sreq, prefix, prefix_len) != 0) {
+        return false;
+    }
+
+    if (sreq[prefix_len] != SEPARATOR || sreq[mac_start + MAC_LEN] != SEPARATOR) {
+        return false;
+    }
+
+    for (int i = 0; i < 17; i++) {
+        char c = sreq[mac_start + i];
+        if (i % 3 == 2) {
+            if (c != ':') 
+                return false;
+        } else  if (!isxdigit(c)){
+            return false;
+        }
+    }
+
+    for (int i = suffix_start; i < len; i++) {
+        // if (!isupper(sreq[i]))
+        if (!isupper(sreq[i]) && sreq[i] != '\n') // for now - to test working with openssl client
+            return false;
+    }
+
     return true;
 }
 
@@ -79,7 +108,7 @@ int handle_client(WOLFSSL* ssl) {
     char            buff[MSGLEN];
     char            err[] = "ERR";
     char            ack[] = "ACK";
-    char            sns_ack[] = "SENSORACK";
+    char            sns_acc[] = "SENSORACC";
     char            mac[MAC_LEN+1];
 
     while (cont == 1) {
@@ -98,7 +127,7 @@ int handle_client(WOLFSSL* ssl) {
             buff[recv_len] = 0;
             printf("Recieved: \"%s\"\n", buff);
 
-            if (recv_len != SREQ_LEN || !validate_sreq(buff)){
+            if ((recv_len <= MIN_SREQ_LEN && MAX_SREQ_LEN <= recv_len) || !validate_sreq(buff, recv_len)){
                 state = ES_BAD_REQ_FMT;
                 break;
             }
@@ -120,7 +149,7 @@ int handle_client(WOLFSSL* ssl) {
             break;
         
         case S_SND_SNSACK:
-            if (wolfSSL_write(ssl, sns_ack, sizeof(sns_ack)) < 0){
+            if (wolfSSL_write(ssl, sns_acc, sizeof(sns_acc)) < 0){
                 state = ES_W_FAILED;
             } else {
                 printf("SENSORACK sent succesfully\n");
