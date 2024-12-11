@@ -19,10 +19,10 @@
 #define APP_DTLS_BUF_SIZE 64
 
 #ifndef NUM_READINGS
-  #define NUM_READINGS 5
+  #define NUM_READINGS 2
 #endif
 #ifndef READING_LEN
-  #define READING_LEN 5
+  #define READING_LEN 6
 #endif
 
 #define MAIN_QUEUE_SIZE     (8)
@@ -40,7 +40,7 @@ static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 int handle_certs(void) {
 	int ret;
 
-    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
+    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_PEER, NULL);
 	LOG(LOG_INFO, "Loading CA cert\n");
 	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
 
@@ -185,10 +185,8 @@ int verify_sensor(void) {
 		} while (ret <= 0);
 		buf[ret] = (char)0;
 		LOG(LOG_INFO, "Received: '%s'\n", buf);
-		if (!strcmp(buf, "SENSORACC\n")) {
-			LOG(LOG_INFO, "Received SENSORACC\nsending ACK\n");
+		if (!strcmp(buf, "SENSORACC")) {
 			confirmation = 1;
-			wolfSSL_write(tls_socket_addr->ssl, ack_buf, strlen(ack_buf));
 		}
 	}
 
@@ -196,7 +194,6 @@ int verify_sensor(void) {
 }
 
 int send_readings(char *readings[]) {
-	uint16_t offset = 0;
 	int16_t ret = 0;
 	uint8_t ack = 0;
 	char ack_buf[5];
@@ -207,13 +204,7 @@ int send_readings(char *readings[]) {
 	const uint8_t max_ack_timeouts = 10;
 	const uint8_t max_errors = 3;
 
-	/* Craft the sensor reading packet */
-	for (size_t i = 0; i < NUM_READINGS; ++i) {
-		strncpy(&buf[offset], readings[i], READING_LEN);
-		offset += READING_LEN;
-		buf[offset] = (i == NUM_READINGS - 1) ? (char)0 : '%';
-		offset ++;
-	}
+	format_packet(buf, NUM_READINGS, readings);
 
 	LOG(LOG_INFO, "Crafted packet: '%s'\n", buf);
 
@@ -228,15 +219,14 @@ int send_readings(char *readings[]) {
 		/* Read into the ack buf */
 		ret = wolfSSL_read(tls_socket_addr->ssl, ack_buf, 4);
 
-
 		/* Check if ACK or ERR*/
 		if (ret >= 4) {
 			/* Null-terminate, just in case */
 			ack_buf[ret] = (char)0;
 
-			if (!strcmp(ack_buf, "ACK\n")) {
+			if (!strcmp(ack_buf, "ACK")) {
 				ack = 1;
-			} else if (!strcmp(ack_buf, "ERR\n")) {
+			} else if (!strcmp(ack_buf, "ERR")) {
 				errors++;
 				LOG(LOG_WARNING, "Server reports error with reading! (%d/%d)\n", errors, max_errors);
 				if (errors >= max_errors) {

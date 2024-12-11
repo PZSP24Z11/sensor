@@ -3,10 +3,11 @@
 #include <string.h>
 
 #define DELIMETER '%'
+#define HEXBUF_SIZE 3
 
 /* Formatting MAC addresses to a human-readable form */
 void format_mac(char *buf, uint8_t *addr, uint8_t len) {
-	char hex_buf[3];
+	char hex_buf[HEXBUF_SIZE];
 	for (size_t i = 0; i < len; ++i) {
 		sprintf(hex_buf, "%x", addr[i]);
 		if (addr[i] < 16) {

@@ -5,7 +5,7 @@ RIOTBASE ?= $(CURDIR)/../RIOT
 # Constants
 SAMPLE_RATE = 1000
 NUM_READINGS = 2
-READING_LEN = 5
+READING_LEN = 6
 
 # development process:
 DEVELHELP = 1
