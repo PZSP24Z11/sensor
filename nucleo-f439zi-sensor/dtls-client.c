@@ -19,10 +19,10 @@
 #define APP_DTLS_BUF_SIZE 64
 
 #ifndef NUM_READINGS
-  #define NUM_READINGS 5
+  #define NUM_READINGS 2
 #endif
 #ifndef READING_LEN
-  #define READING_LEN 5
+  #define READING_LEN 6
 #endif
 
 extern void format_mac(char *buf, uint8_t *addr, uint8_t len);
@@ -37,7 +37,7 @@ static sock_tls_t *tls_socket_addr = &tls_socket;
 int handle_certs(void) {
 	int ret;
 
-    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
+    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_PEER, NULL);
 	LOG(LOG_INFO, "Loading CA cert\n");
 	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
 
@@ -193,7 +193,6 @@ int verify_sensor(void) {
 }
 
 int send_readings(char *readings[]) {
-	uint16_t offset = 0;
 	int16_t ret = 0;
 	uint8_t ack = 0;
 	char ack_buf[5];
@@ -204,13 +203,7 @@ int send_readings(char *readings[]) {
 	const uint8_t max_ack_timeouts = 10;
 	const uint8_t max_errors = 3;
 
-	/* Craft the sensor reading packet */
-	for (size_t i = 0; i < NUM_READINGS; ++i) {
-		strncpy(&buf[offset], readings[i], READING_LEN);
-		offset += READING_LEN;
-		buf[offset] = (i == NUM_READINGS - 1) ? (char)0 : '%';
-		offset ++;
-	}
+	format_packet(buf, NUM_READINGS, readings);
 
 	LOG(LOG_INFO, "Crafted packet: '%s'\n", buf);
 
@@ -224,7 +217,6 @@ int send_readings(char *readings[]) {
 
 		/* Read into the ack buf */
 		ret = wolfSSL_read(tls_socket_addr->ssl, ack_buf, 4);
-
 
 		/* Check if ACK or ERR*/
 		if (ret >= 4) {

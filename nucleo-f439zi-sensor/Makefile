@@ -7,7 +7,7 @@ BOARD ?= native
 RIOTBASE ?= $(CURDIR)/../RIOT
 
 NUM_READINGS = 2
-READING_LEN = 5
+READING_LEN = 6
 
 # GNRC network stack
 USEMODULE += netdev_default
