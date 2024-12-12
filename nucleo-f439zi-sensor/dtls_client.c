@@ -154,7 +154,6 @@ int verify_sensor(void) {
 	int ret = 0;
 	char buf[APP_DTLS_BUF_SIZE] = "SENSORREQ";
 	char req_buf[10] = "SENSORREQ";
-	char ack_buf[4] = "ACK";
 	char type_buf[3] = "TH";
 
 	/* Get MAC address */
