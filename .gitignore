@@ -1,4 +1,5 @@
 # Ignore development files
+RIOT/build
 
 .ccls
 .ccls-cache
