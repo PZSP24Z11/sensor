@@ -42,7 +42,7 @@ void start_gpio_loop_thread(void)
 {
     {
         static char gpio_thread_stack[THREAD_STACKSIZE_DEFAULT];
-        thread_create(gpio_thread_stack, sizeof(gpio_thread_stack), THREAD_PRIORITY_MAIN + 1, 0, 
+        thread_create(gpio_thread_stack, sizeof(gpio_thread_stack), 8, 0, 
                     gpio_loop_thread_function, NULL, "gpio_loop_thread_function");
     }
 }
@@ -51,7 +51,7 @@ void initialize_lcd(void)
 {
 	printf("test\n");
     LOG(LOG_INFO, "Initializing LCD... \n");
-    ztimer_sleep(ZTIMER_MSEC, 2000);
+    ztimer_sleep(ZTIMER_MSEC, 1000);
     if (pcd8544_init(&lcd_device, SPI_INTERFACE, LCD_CS, LCD_RESET, LCD_MODE) == 0) {
         LOG(LOG_INFO, "LCD initialized\n");
     } else {

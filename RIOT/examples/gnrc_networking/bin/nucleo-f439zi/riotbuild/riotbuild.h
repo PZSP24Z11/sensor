@@ -32,7 +32,7 @@
 #define RIOT_CPU CPU_STM32
 #define CPU_RAM_BASE 0x20000000
 #define CPU_RAM_SIZE 0x30000
-#define RIOT_VERSION "UNKNOWN (builddir: /mnt/c/Users/Maciej/Desktop/sensor/RIOT)"
+#define RIOT_VERSION "UNKNOWN (builddir: /home/maciej/Desktop/sensor/RIOT)"
 #define RIOT_VERSION_CODE RIOT_VERSION_NUM(2042,5,23,0)
 #define MODULE_AUTO_INIT 1
 #define MODULE_AUTO_INIT_GNRC_IPV6 1

@@ -40,7 +40,7 @@ static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 int handle_certs(void) {
 	int ret;
 
-    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_PEER, NULL);
+    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
 	LOG(LOG_INFO, "Loading CA cert\n");
 	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
 

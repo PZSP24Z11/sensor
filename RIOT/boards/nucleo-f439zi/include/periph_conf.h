@@ -150,7 +150,7 @@ static const pwm_conf_t pwm_config[] = {
 static const spi_conf_t spi_config[] = {
     {
         .dev            = SPI1,
-        .mosi_pin       = GPIO_PIN(PORT_A, 7),
+        .mosi_pin       = GPIO_PIN(PORT_B, 5),  // changed from A7 to reslove conflict with LCD
         .miso_pin       = GPIO_PIN(PORT_A, 6),
         .sclk_pin       = GPIO_PIN(PORT_A, 5),
         .cs_pin         = GPIO_UNDEF,
@@ -188,7 +188,7 @@ static const eth_conf_t eth_config = {
         GPIO_PIN(PORT_G, 11),
         GPIO_PIN(PORT_C, 4),
         GPIO_PIN(PORT_C, 5),
-        GPIO_PIN(PORT_A, 6), // changed from A7 to reslove conflict with LCD
+        GPIO_PIN(PORT_A, 7),
         GPIO_PIN(PORT_C, 1),
         GPIO_PIN(PORT_A, 2),
         GPIO_PIN(PORT_A, 1),
