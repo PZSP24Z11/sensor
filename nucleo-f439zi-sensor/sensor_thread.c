@@ -9,7 +9,6 @@
 dht_t sensor;
 extern int16_t hum;
 extern int16_t temp;
-char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
 
 extern int send_readings(const char *readings[]);
 
@@ -86,14 +85,20 @@ void *mock_measurements_thread_function(void *arg)
 
 void start_gather_measurements_thread(void)
 {
-    thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 2, 0, 
-                gather_measurements_thread_function, NULL, "gather_measurements_thread_function");
+    {
+        static char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
+        thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN + 2, 0, 
+                    gather_measurements_thread_function, NULL, "gather_measurements_thread_function");
+    }
 }
 
 void start_mock_measurements_thread(void)
 {
-    thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 2, 0, 
-                mock_measurements_thread_function, NULL, "mock_measurements_thread_function");
+    {
+        static char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
+        thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN + 2, 0, 
+                    mock_measurements_thread_function, NULL, "mock_measurements_thread_function");
+    }
 }
 
 void initialize_sensor(void)
