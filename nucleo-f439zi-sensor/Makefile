@@ -36,9 +36,4 @@ CFLAGS += -DNUM_READINGS=$(NUM_READINGS)
 CFLAGS += -DREADING_LEN=$(READING_LEN)
 CFLAGS += -DSAMPLE_RATE=$(SAMPLE_RATE)
 
-# used without a gpiochip
-ifneq (,$(filter native native64,$(BOARD)))
- USEMODULE += periph_gpio_mock
-endif
-
 include $(RIOTBASE)/Makefile.include

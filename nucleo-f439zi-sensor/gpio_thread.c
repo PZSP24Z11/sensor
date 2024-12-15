@@ -49,6 +49,7 @@ void start_gpio_loop_thread(void)
 
 void initialize_lcd(void)
 {
+	printf("test\n");
     LOG(LOG_INFO, "Initializing LCD... \n");
     ztimer_sleep(ZTIMER_MSEC, 2000);
     if (pcd8544_init(&lcd_device, SPI_INTERFACE, LCD_CS, LCD_RESET, LCD_MODE) == 0) {

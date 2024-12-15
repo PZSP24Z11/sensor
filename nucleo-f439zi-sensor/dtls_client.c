@@ -154,7 +154,6 @@ int verify_sensor(void) {
 	int ret = 0;
 	char buf[APP_DTLS_BUF_SIZE] = "SENSORREQ";
 	char req_buf[10] = "SENSORREQ";
-	char ack_buf[4] = "ACK";
 	char type_buf[3] = "TH";
 
 	/* Get MAC address */
@@ -254,6 +253,7 @@ int initialize_dtls(char* ip)
 	msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 	wolfSSL_Init();
 	wolfSSL_Debugging_ON();
+	LOG(LOG_INFO, "DTLS Init complete\n");
 
 	if (dtls_client(ip)) {
 		LOG(LOG_ERROR, "ERROR: dtls_client failed, exitting...\n");
