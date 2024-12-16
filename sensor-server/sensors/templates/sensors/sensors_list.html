@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sensors List</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'sensors/css/style.css' %}">
+</head>
+
+<body>
+    <h1>Available Sensors</h1>
+    <div id="sensors">
+        {% for sensor in sensors %}
+        <button onclick="loadMeasurements({{ sensor.id }})">
+            {{ sensor.nazwa_sensora }} ({{ sensor.adres_MAC }})
+        </button>
+        {% endfor %}
+    </div>
+
+    <h2>Latest Measurements</h2>
+    <div id="measurements">
+        <table>
+            <thead>
+                <tr>
+                    <th>Measurement Type</th>
+                    <th>Value</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="measurements-body">
+                <tr>
+                    <td colspan="3">Select a sensor to view its measurements.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function loadMeasurements(sensorId) {
+            fetch(`/sensors/latest_measurements/${sensorId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('measurements-body');
+                    tbody.innerHTML = '';
+                    if (data.measurements && data.measurements.length > 0) {
+                        data.measurements.forEach(measurement => {
+                            tbody.innerHTML += `
+                                <tr>
+                                    <td>${measurement.typ_pomiaru}</td>
+                                    <td>${measurement.wartosc}</td>
+                                    <td>${measurement.data}</td>
+                                </tr>`;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="3">No measurements available.</td></tr>';
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+
+</html>

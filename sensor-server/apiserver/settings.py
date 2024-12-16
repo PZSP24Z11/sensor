@@ -58,7 +58,7 @@ ROOT_URLCONF = "apiserver.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -81,7 +81,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "sensor_database",
-        "USER": "django_user",
+        "USER": "root",
         "PASSWORD": "Admin@123",
         "HOST": "localhost",
         "PORT": "3306",
