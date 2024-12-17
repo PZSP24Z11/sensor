@@ -2,7 +2,7 @@
 #include "ztimer.h"
 #include "log.h"
 
-bool MOCK_MODE = false;
+bool MOCK_MODE = true;
 
 int16_t hum = 0;
 int16_t temp = 0;
