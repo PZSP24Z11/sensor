@@ -2,7 +2,7 @@
 #include "ztimer.h"
 #include "log.h"
 
-bool MOCK_MODE = false;
+bool MOCK_MODE = true;
 
 int16_t hum = 0;
 int16_t temp = 0;
@@ -26,11 +26,13 @@ int start_sensor(int argc, char **argv) {
     if(MOCK_MODE)
     {
         start_mock_measurements_thread();
+        LOG(LOG_INFO, "Mock measurements initialized\n");
     }
     else
     {
         initialize_sensor();
         initialize_lcd();
+        LOG(LOG_INFO, "Sensor and LCD initialized\n");
 
         start_gather_measurements_thread();
         start_gpio_loop_thread();
