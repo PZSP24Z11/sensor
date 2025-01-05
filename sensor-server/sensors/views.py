@@ -1,6 +1,8 @@
-from django.http import JsonResponse, HttpResponse
-from .models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru
+from django.http import JsonResponse, HttpResponse, HttpRequest
+from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik
+from django.contrib.auth.hashers import make_password
 from django.views.decorators.csrf import csrf_exempt
+import json
 import re
 import string
 import random
@@ -9,7 +11,7 @@ from datetime import datetime
 type_map = {"T": "Temperature", "H": "Humidity"}
 
 
-def get_last_pomiar(request):
+def get_last_pomiar(_: HttpRequest) -> JsonResponse:
     try:
         latest_record = Pomiar.objects.latest("data_pomiaru")
         return JsonResponse({"value": latest_record.wartosc_pomiaru})
@@ -18,7 +20,25 @@ def get_last_pomiar(request):
 
 
 @csrf_exempt
-def sensor_register_view(request):
+def add_uzytkownik(request: HttpRequest) -> JsonResponse:
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        Uzytkownik.objects.create(
+            nazwa_uzytkownika=data['name'],
+            haslo=make_password(data['password']),
+            email=data['email'],
+            powiadomienie_email=data['wants_emails']
+        )
+        return JsonResponse({"message": "User created successfully"}, status=201)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@csrf_exempt
+def sensor_register_view(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         try:
             data = request.body.decode("utf-8")
@@ -59,7 +79,7 @@ def sensor_register_view(request):
 
 
 @csrf_exempt
-def measurements_register_view(request):
+def measurements_register_view(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         try:
             data = request.body.decode("utf-8")
