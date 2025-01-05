@@ -3,6 +3,7 @@ from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkow
 from django.contrib.auth.hashers import make_password
 from django.views.decorators.csrf import csrf_exempt
 import json
+from django.shortcuts import render
 import re
 import string
 import random
@@ -123,3 +124,24 @@ def measurements_register_view(request: HttpRequest) -> HttpResponse:
             return HttpResponse("3")
 
     return HttpResponse("3")
+
+
+def sensors_list_view(request: HttpRequest) -> HttpResponse:
+    sensors = Sensor.objects.all()
+    return render(request, "sensors/sensors_list.html", {"sensors": sensors})
+
+
+def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonResponse:
+    try:
+        measurements = Pomiar.objects.filter(sensor_id=sensor_id).order_by("-wartosc_pomiaru")[:10]
+        data = [
+            {
+                "typ_pomiaru": measurement.typ_pomiaru.nazwa_pomiaru,
+                "wartosc": measurement.wartosc_pomiaru,
+                "data": measurement.data_pomiaru.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            for measurement in measurements
+        ]
+        return JsonResponse({"measurements": data})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

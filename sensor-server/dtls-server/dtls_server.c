@@ -171,9 +171,8 @@ int send_req_to_api(CURL* curl, char sreq[], int len) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
     } else {
         printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
-        printf("Response: %s\n", chunk.memory);
+        printf("Server response: %s\n", chunk.memory);
         result = atoi(chunk.memory);
-        printf("result %d\n", result);
     }
 
     free(chunk.memory);
@@ -197,7 +196,7 @@ int send_ms_to_api(CURL* curl, char mac[], char ms[], int ms_len) {
     strncat(msg_to_api, ms, ms_len);
 
     msg_to_api[MAC_LEN + ms_len + 2] = '\0';
-    printf("sending measurements to server: %s\n", msg_to_api);
+    printf("sending measurements to API server: %s\n", msg_to_api);
 
     curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:8000/sensor/measurements/");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -214,7 +213,6 @@ int send_ms_to_api(CURL* curl, char mac[], char ms[], int ms_len) {
         printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
         printf("Response: %s\n", chunk.memory);
         result = atoi(chunk.memory);
-        printf("result %d\n", result);
     }
 
     free(chunk.memory);
@@ -268,10 +266,12 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
             switch (response)
             {
             case SENSOR_KNOWN:
+                printf("sensor is known by API server\n");
                 state = S_SND_SNSACC;
                 break;
             case SENSOR_REG_SUB:
 				// state = S_SEND_REQUEST_SUBMITED;
+                printf("API server registered sensor\n");
 				state = S_SND_SNSACC;
                 break;
             case BAD_REQUEST:
@@ -310,9 +310,12 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
 
             if (!validate_measurements(buff, recv_len)) {
                 state = ES_BAD_MS_FMT;
-            } else if (send_ms_to_api(curl, mac, buff, recv_len) != MEASUREMENTS_ACCEPTED){ // 
+            } else if (send_ms_to_api(curl, mac, buff, recv_len) != MEASUREMENTS_ACCEPTED){
+                printf("API server didnt accept sent measurements\n");
                 state = ES_API_COMM_MS;
+                break;
             } else {
+                printf("API server accepted sent measurements\n");
                 state = S_SND_ACK;
             }
             break;

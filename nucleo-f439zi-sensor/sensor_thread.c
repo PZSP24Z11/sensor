@@ -88,7 +88,7 @@ void start_gather_measurements_thread(void)
 {
     {
         static char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
-        thread_create(gather_thread_stack, sizeof(gather_thread_stack), 9, 0, 
+        thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, 
                     gather_measurements_thread_function, NULL, "gather_measurements_thread_function");
     }
 }
@@ -97,7 +97,7 @@ void start_mock_measurements_thread(void)
 {
     {
         static char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
-        thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, 
+        thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 1, 0,
                     mock_measurements_thread_function, NULL, "mock_measurements_thread_function");
     }
 }
