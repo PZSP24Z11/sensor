@@ -20,35 +20,42 @@
 // STATES
 #define S_RECIEVE_REQUEST           0 // recieve sensor request
 #define S_SEND_REQUEST_TO_SERVER    1
-#define S_CHECK_REG                 1 // check if sensor is registered
-#define S_SND_SNSACC                2 // send sensoracc
+#define S_SEND_SENSOR_ACCEPT        2 // send sensoracc
 #define S_RECIEVE_MEASUREMENTS      3 // recieve measurements
-#define S_SND_ACK                   4 // send ack
+#define S_SEND_SENSOR_ACK           4 // send ack
 #define S_SEND_REQUEST_SUBMITED     5
 #define S_DONE                      6 
 
-// 
-#define ES_BAD_REQ_FMT  -1
-#define ES_BAD_MS_FMT   -2
-#define ES_API_COMM_REQ -3 // error communicating with API
-#define ES_API_COMM_MS  -4 
+// ERROR STATES
+#define ES_BAD_REQUEST_FORMAT                   -1
+#define ES_BAD_MEASUREMENT_FORMAT               -2
+#define ES_API_COMMUNICATION_BAD_REQUEST        -3 // error communicating with API
+#define ES_API_COMMUNICATION_BAD_MEASUREMENT    -4
 
-#define ES_R_FAILED     -21
-#define ES_W_FAILED     -20
+#define ES_API_CONNECTION_REQUEST               -10
+#define ES_API_CONNECTION_MEASUREMENT           -11
+
+#define ES_READ_FAILED                          -21
+#define ES_WRITE_FAILED                         -20
 
 // MESSAGES CONSTANTS
-#define SEPARATOR               '%'
-#define MIN_SREQ_LEN            29
-#define MAX_SREQ_LEN            34
-#define MAC_LEN                 17
-#define MEASUREMENT_DATA_LEN     4   // measurement length - format eg T1750; - temperature 17.50
+#define SEPARATOR           '%'
+#define MIN_SREQ_LEN        29
+#define MAX_SREQ_LEN        34
+#define MAC_LEN             17
+#define MEASUREMENT_LEN     5   // measurement length - format eg T1750; - temperature 17.50
 
 // API COMMUNICATION - responses
-#define SENSOR_KNOWN            1 // sensor was already registered
-#define SENSOR_REG_SUB          2 // sensor was not registered, register request submitted
-#define BAD_REQUEST             3 // server responed with bad request  
+#define SENSOR_KNOWN                1 // sensor was already registered
+#define SENSOR_REG_SUB              2 // sensor was not registered, register request submitted
+#define BAD_REQUEST                 3 // server responed with bad request  
 
-#define MEASUREMENTS_ACCEPTED   2
+#define MEASUREMENTS_ACCEPTED       2
+#define MEASUREMENTS_REJECTED       3
+#define ERROR_IN_API_COMMUNICATION  -1
+
+#define API_REQUEST_ENDPOINT        "http://localhost:8000/sensor/register/"
+#define API_MEASUREMENTS_ENDPOINT   "http://localhost:8000/sensor/measurements/"
 
 static int cleanup;
 struct sockaddr_in6 servAddr;
@@ -89,28 +96,25 @@ bool validate_sreq(const char sreq[], int len){
 }
 
 bool validate_measurements(const char ms[], int ms_len){
-    char measurement[MEASUREMENT_DATA_LEN + 2];
+    char measurement[MEASUREMENT_LEN + 1];
     int i = 0;
 
-    if (ms_len < 5)
+    if (ms_len < MEASUREMENT_LEN)
         return false;
 
     while (i < ms_len) {
         int j = 0;
-                
 
-        while (i < ms_len && ms[i] != '%' && j <= MEASUREMENT_DATA_LEN) {
+        while (i < ms_len && ms[i] != '%' && j < MEASUREMENT_LEN) {
             measurement[j++] = ms[i++];
         }
         measurement[j] = 0;
 
-        printf("measurement: %s\n", measurement);
         if (j != 5 || !isupper(measurement[0]))
             return false;
-
-        for (int k; k <= MEASUREMENT_DATA_LEN; k++) {
+        for (int k = 1; k < MEASUREMENT_LEN; k++) {
             if (!isdigit(measurement[k]))
-            // if (!isdigit(measurement[k]) && measurement[k] != '\n') // for development
+            // if (!isdigit(measurement[k]) && measurement[k] != '\n') // for development - communication with openssl client
                 return false;
         }
 
@@ -150,17 +154,18 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
     return realsize;
 }
 
-int send_req_to_api(CURL* curl, char sreq[], int len) {
+int send_request_to_api(CURL* curl, char sreq[], int len) {
     CURLcode res;
-    int result = -1;
+    int result;
 
     struct MemoryStruct chunk;
     chunk.memory = malloc(1);
     chunk.size = 0; 
+    
+    printf("sending sesnor request to api: %s\n", sreq);
 
-    curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:8000/sensor/register/");
+    curl_easy_setopt(curl, CURLOPT_URL, API_REQUEST_ENDPOINT);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    printf("sreq: %s\n", sreq);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, sreq);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
@@ -169,9 +174,9 @@ int send_req_to_api(CURL* curl, char sreq[], int len) {
 
     if(res != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        result = ERROR_IN_API_COMMUNICATION;
     } else {
-        printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
-        printf("Server response: %s\n", chunk.memory);
+        printf("sent sensor request to api: %s\n", sreq);
         result = atoi(chunk.memory);
     }
 
@@ -180,9 +185,8 @@ int send_req_to_api(CURL* curl, char sreq[], int len) {
 }
 
 int send_ms_to_api(CURL* curl, char mac[], char ms[], int ms_len) {
-    // for now just mock
     CURLcode res;
-    int result = -1;
+    int result;
 
     struct MemoryStruct chunk;
     chunk.memory = malloc(1);
@@ -198,7 +202,7 @@ int send_ms_to_api(CURL* curl, char mac[], char ms[], int ms_len) {
     msg_to_api[MAC_LEN + ms_len + 2] = '\0';
     printf("sending measurements to API server: %s\n", msg_to_api);
 
-    curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:8000/sensor/measurements/");
+    curl_easy_setopt(curl, CURLOPT_URL, API_MEASUREMENTS_ENDPOINT);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     printf("msg to api: %s\n", msg_to_api);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, msg_to_api);
@@ -210,8 +214,6 @@ int send_ms_to_api(CURL* curl, char mac[], char ms[], int ms_len) {
     if(res != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
     } else {
-        printf("%lu bytes retrieved\n", (unsigned long)chunk.size);
-        printf("Response: %s\n", chunk.memory);
         result = atoi(chunk.memory);
     }
 
@@ -240,15 +242,21 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
             if (recv_len < 0){
                 int read_err = wolfSSL_get_error(ssl, 0);
                 if(read_err != SSL_ERROR_WANT_READ && check_sensor_err(ssl)) {
-                    state = ES_R_FAILED;
+                    state = ES_READ_FAILED;
                 }
             }
+
+            if (recv_len >= sizeof(buff)){
+                memset(buff, 0, sizeof(buff));
+                printf("Recieved more than buffer size. Recieved: %d", recv_len);
+                state = ES_READ_FAILED;
+            }
+
             // for dev
             buff[recv_len] = 0;
-            printf("Recieved: \"%s\"\n", buff);
 
             if ((recv_len <= MIN_SREQ_LEN && MAX_SREQ_LEN <= recv_len) || !validate_sreq(buff, recv_len)){
-                state = ES_BAD_REQ_FMT;
+                state = ES_BAD_REQUEST_FORMAT;
                 break;
             }
 
@@ -256,35 +264,37 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
             mac[MAC_LEN] = '\0';
             printf("MAC: %s\n", mac);
 
-
             state = S_SEND_REQUEST_TO_SERVER;
             break;
 
         case S_SEND_REQUEST_TO_SERVER:
-            response = send_req_to_api(curl, buff, recv_len);
+            response = send_request_to_api(curl, buff, recv_len);
 
             switch (response)
             {
             case SENSOR_KNOWN:
                 printf("sensor is known by API server\n");
-                state = S_SND_SNSACC;
+                state = S_SEND_SENSOR_ACCEPT;
                 break;
             case SENSOR_REG_SUB:
 				// state = S_SEND_REQUEST_SUBMITED;
                 printf("API server registered sensor\n");
-				state = S_SND_SNSACC;
+				state = S_SEND_SENSOR_ACCEPT;
                 break;
             case BAD_REQUEST:
+                state = ES_API_COMMUNICATION_BAD_REQUEST;
+                break;
+            case ERROR_IN_API_COMMUNICATION:
             default:
-                state = ES_API_COMM_REQ;
+                state = ES_API_CONNECTION_REQUEST;
                 break;
             }
 
             break;
         
-        case S_SND_SNSACC:
+        case S_SEND_SENSOR_ACCEPT:
             if (wolfSSL_write(ssl, sns_acc, sizeof(sns_acc)) < 0){
-                state = ES_W_FAILED;
+                state = ES_WRITE_FAILED;
             } else {
                 printf("SENSORACC sent succesfully\n");
                 state = S_RECIEVE_MEASUREMENTS;
@@ -297,35 +307,39 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
             if (recv_len < 0){
                 int read_err = wolfSSL_get_error(ssl, 0);
                 if(read_err != SSL_ERROR_WANT_READ && check_sensor_err(ssl)) {
-                    state = ES_R_FAILED;
+                    state = ES_READ_FAILED;
                 }
             }
 
             if (recv_len >= sizeof(buff)){
                 memset(buff, 0, sizeof(buff));
                 printf("Recieved more than buffer size. Recieved: %d", recv_len);
-                state = ES_R_FAILED;
+                state = ES_READ_FAILED;
             }
             buff[recv_len] = 0;
 
             if (!validate_measurements(buff, recv_len)) {
-                state = ES_BAD_MS_FMT;
-            } else if (send_ms_to_api(curl, mac, buff, recv_len) != MEASUREMENTS_ACCEPTED){
-                printf("API server didnt accept sent measurements\n");
-                state = ES_API_COMM_MS;
+                state = ES_BAD_MEASUREMENT_FORMAT;
+            } else if ((response = send_ms_to_api(curl, mac, buff, recv_len)) != MEASUREMENTS_ACCEPTED){
+                if (response == MEASUREMENTS_REJECTED){
+                    printf("API server didnt accept sent measurements\n");
+                    state = ES_API_COMMUNICATION_BAD_MEASUREMENT;
+                } else {
+                    printf("Error communicating with API");
+                    state = ES_API_CONNECTION_MEASUREMENT;
+                }
                 break;
             } else {
                 printf("API server accepted sent measurements\n");
-                state = S_SND_ACK;
+                state = S_SEND_SENSOR_ACK;
             }
             break;
         
-        case S_SND_ACK:
+        case S_SEND_SENSOR_ACK:
             if (wolfSSL_write(ssl, ack, sizeof(ack)) < 0){
-                state = ES_W_FAILED;
+                state = ES_WRITE_FAILED;
             } else {
                 printf("ACK sent succesfully\n");
-                // state = S_DONE;
                 state = S_RECIEVE_MEASUREMENTS;
             }
             break;
@@ -339,50 +353,58 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
             cont = 0;
             break;
 // ERRORS
-        case ES_BAD_REQ_FMT:
+        case ES_BAD_REQUEST_FORMAT:
             if (wolfSSL_write(ssl, err, sizeof(err)) < 0) {
-                state = ES_W_FAILED;
+                state = ES_WRITE_FAILED;
             } else {
                 printf("bad request format, err msg sent\n");
-                state = ES_BAD_REQ_FMT;
+                state = ES_BAD_REQUEST_FORMAT;
             }
             break;
         
-        case ES_BAD_MS_FMT:
+        case ES_BAD_MEASUREMENT_FORMAT:
             if (wolfSSL_write(ssl, err, sizeof(err)) < 0) {
-                state = ES_W_FAILED;
+                state = ES_WRITE_FAILED;
             } else {
                 printf("bad measurement format, err sent\n");
                 state = S_RECIEVE_MEASUREMENTS;
             }
             break;
 
-        case ES_W_FAILED:
+        case ES_WRITE_FAILED:
             printf("wolfSSL_write fail\n");
             cont = 0;
             break;
         
-        case ES_R_FAILED:
+        case ES_READ_FAILED:
             printf("SSL_read failed\n");
             cont = 0;
             break;
         
-        case ES_API_COMM_REQ:
-            printf("error while communicating with API - bad request?");
+        case ES_API_CONNECTION_REQUEST:
+            printf("error while communicating with API - could not connect");
+            cont = 0;
+            break;
+        
+        case ES_API_CONNECTION_MEASUREMENT:
+            printf("error while communicating with API - could not send measurments");
+            state = S_RECIEVE_MEASUREMENTS;
+            break;
+        
+        case ES_API_COMMUNICATION_BAD_REQUEST:
+            printf("error while communicating with API - bad request");
             state = S_RECIEVE_REQUEST;
             break;
 
-        case ES_API_COMM_MS:
-            printf("error while communicating with API - bad measurements?");
+        case ES_API_COMMUNICATION_BAD_MEASUREMENT:
+            printf("error while communicating with API - bad measurements");
             state = S_RECIEVE_MEASUREMENTS;
             break;
-
         default:
             cont = 0;
             break;
         }
     }
-
     return 0;
 
 }
