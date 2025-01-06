@@ -7,6 +7,11 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
+    <div class="container mt-5">
+        <h1>Welcome to the Home Page</h1>
+        <a href="{% url 'login' %}" class="btn btn-primary">Login</a>  <!-- This will redirect to the login page -->
+        <a href="{% url 'register' %}" class="btn btn-primary">Register</a>  <!-- This will redirect to the login page -->
+    </div>
     <h1>Latest Sensor Value</h1>
     <p id="valueDisplay">Waiting for data...</p>
 
