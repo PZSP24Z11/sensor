@@ -5,7 +5,7 @@ SRC = helpers.c dtls_server.c
 
 HEADERS = constants.h helpers.h
 
-OUT = server
+OUT = dtls-server
 
 WOLFSSL_FLAGS = $(shell wolfssl-config --cflags --libs)
 CURL_FLAGS = -lcurl

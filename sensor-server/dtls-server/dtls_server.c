@@ -12,12 +12,9 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "constants.h"
 #include "helpers.h"
-
-static int cleanup;
-struct sockaddr_in6 server_address;
-struct sockaddr_in6 client_address;
 
 
 int handle_client(WOLFSSL* ssl, CURL* curl) {
@@ -157,7 +154,7 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
                 state = ES_WRITE_FAILED;
             } else {
                 printf("bad request format, err msg sent\n");
-                state = ES_BAD_REQUEST_FORMAT;
+                state = S_RECIEVE_REQUEST;
             }
             break;
         
@@ -208,6 +205,26 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
 
 }
 
+typedef struct {
+    WOLFSSL* ssl;
+    CURL* curl;
+} client_args_t;
+
+
+void* handle_client_thread(void* arg) {
+    client_args_t* client_args = (client_args_t*)arg;
+    handle_client(client_args->ssl, client_args->curl);
+    wolfSSL_shutdown(client_args->ssl);
+    wolfSSL_free(client_args->ssl);
+    free(client_args);
+    return NULL;
+}
+
+
+static int cleanup;
+struct sockaddr_in6 server_address;
+struct sockaddr_in6 client_address;
+
 
 int main(int argc, char** argv) {
     int             cont = 0;
@@ -219,7 +236,7 @@ int main(int argc, char** argv) {
     int             connfd = 0;
     int             listenfd = 0;   /* Initialize our socket */
     WOLFSSL*        ssl = NULL;
-    socklen_t       cliLen;
+    socklen_t       cli_len;
     socklen_t       len = sizeof(int);
     unsigned char   b[MSGLEN];      /* watch for incoming messages */       
     CURL*           curl;
@@ -286,15 +303,14 @@ int main(int argc, char** argv) {
 
         printf("Awaiting client connection on port %d\n", SERV_PORT);
 
-        cliLen = sizeof(client_address);
+        cli_len = sizeof(client_address);
         connfd = (int)recvfrom(listenfd, (char *)&b, sizeof(b), MSG_PEEK,
-                (struct sockaddr*)&client_address, &cliLen);
+                (struct sockaddr*)&client_address, &cli_len);
 
         if (connfd < 0) {
             printf("No clients in que, enter idle state\n");
             continue;
-        }
-        else if (connfd > 0) {
+        } else if (connfd > 0) {
             if (connect(listenfd, (const struct sockaddr *)&client_address,
                         sizeof(client_address)) != 0) {
                 printf("Udp connect failed.\n");
@@ -320,39 +336,32 @@ int main(int argc, char** argv) {
         wolfSSL_set_fd(ssl, listenfd);
 
         if (wolfSSL_accept(ssl) != SSL_SUCCESS) {
-
             int e = wolfSSL_get_error(ssl, 0);
-
             printf("error = %d, %s\n", e, wolfSSL_ERR_reason_error_string(e));
             printf("SSL_accept failed.\n");
             continue;
         }
 
+        client_args_t* client_args = malloc(sizeof(client_args_t));
+        client_args->ssl = ssl;
+        client_args->curl = curl;
 
-        
-        handle_client(ssl, curl);
+        pthread_t client_thread;
+        if (pthread_create(&client_thread, NULL, handle_client_thread, client_args) != 0) {
+            printf("failed to create thread\n");
+            wolfSSL_free(ssl);
+            free(client_args);
+            continue;
+        }
 
-        curl_easy_cleanup(curl);
-        curl_global_cleanup();
-
-        wolfSSL_set_fd(ssl, 0);
-        wolfSSL_shutdown(ssl);
-        wolfSSL_free(ssl);
-
-        printf("Client left cont to idle state\n");
-        cont = 0;
+        pthread_detach(client_thread);
     }
     
-    /* With the "continue" keywords, it is possible for the loop to exit *
-     * without changing the value of cont                                */
-    if (cleanup == 1) {
-        cont = 1;
-    }
 
-    if (cont == 1) {
-        wolfSSL_CTX_free(ctx);
-        wolfSSL_Cleanup();
-    }
+    wolfSSL_CTX_free(ctx);
+    wolfSSL_Cleanup();
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
 
     return 0;
 }
