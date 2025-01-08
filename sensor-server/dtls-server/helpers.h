@@ -4,6 +4,7 @@
 #include <wolfssl/ssl.h>
 #include <curl/curl.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <curl/curl.h>
 
 
