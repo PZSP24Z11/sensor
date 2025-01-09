@@ -152,7 +152,7 @@ def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonRespon
         return JsonResponse({"error": str(e)}, status=500)
 
 
-def login_view(request):
+def login_view(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
@@ -173,7 +173,7 @@ def login_view(request):
     return render(request, "frontend/login.html")
 
 
-def register_view(request):
+def register_view(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         username = request.POST.get("username")
         email = request.POST.get("email")
@@ -201,6 +201,10 @@ def register_view(request):
     return render(request, "frontend/register.html")
 
 
+def index_view(request: HttpRequest) -> HttpResponse:
+    return render(request, 'frontend/index.html')
+
+
 @login_required
-def dashboard_view(request):
+def dashboard_view(request: HttpRequest) -> HttpResponse:
     return render(request, "frontend/dashboard.html")
