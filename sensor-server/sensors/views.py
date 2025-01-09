@@ -31,7 +31,7 @@ def add_user(request: HttpRequest) -> JsonResponse:
     try:
         print("siur")
         data = json.loads(request.body)
-        print('sparsowany siur')
+        print("sparsowany siur")
         Uzytkownik.objects.create(
             nazwa_uzytkownika=data["name"],
             haslo=make_password(data["password"]),
@@ -202,7 +202,7 @@ def register_view(request: HttpRequest) -> HttpResponse:
 
 
 def index_view(request: HttpRequest) -> HttpResponse:
-    return render(request, 'frontend/index.html')
+    return render(request, "frontend/index.html")
 
 
 @login_required
