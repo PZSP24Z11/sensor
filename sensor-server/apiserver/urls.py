@@ -17,7 +17,7 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from sensors.views import get_last_pomiar, sensor_register_view, measurements_register_view, add_user
+from sensors.views import get_last_pomiar, sensor_register_view, measurements_register_view, register_view, login_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -26,4 +26,6 @@ urlpatterns = [
     path("sensor/register/", sensor_register_view, name="sensor_register"),
     path("sensor/measurements/", measurements_register_view, name="measurements_register"),
     path("sensors/", include("sensors.urls")),
+    path("register/", register_view, name="register"),
+    path("login/", login_view, name="login"),
 ]
