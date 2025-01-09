@@ -10,7 +10,7 @@ class SensorRegisterViewTests(TestCase):
         self.valid_data = "SENSORREQ%00:1A:2B:3C:4D:5E%T"
         self.invalid_type = "SENSORREQ%00:1A:2B:3C:4D:5E%X"
         self.invalid_data = "INVALIDDATA"
-        self.type_map = {"T": "Temperature", "B": "Humidity"}
+        self.type_map = {"T": "Temperature", "H": "Humidity"}
 
     def test_sensor_register_existing_sensor(self):
         Sensor.objects.create(nazwa_sensora="TestSensor", adres_MAC="00:1A:2B:3C:4D:5E")
