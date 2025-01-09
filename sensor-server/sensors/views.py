@@ -21,12 +21,14 @@ def get_last_pomiar(_: HttpRequest) -> JsonResponse:
 
 
 @csrf_exempt
-def add_uzytkownik(request: HttpRequest) -> JsonResponse:
+def add_user(request: HttpRequest) -> JsonResponse:
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request method"}, status=405)
 
     try:
+        print("siur")
         data = json.loads(request.body)
+        print('sparsowany siur')
         Uzytkownik.objects.create(
             nazwa_uzytkownika=data['name'],
             haslo=make_password(data['password']),
