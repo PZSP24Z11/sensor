@@ -1,13 +1,16 @@
 from django.http import JsonResponse, HttpResponse, HttpRequest
 from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from django.views.decorators.csrf import csrf_exempt
 import json
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 import re
 import string
 import random
 from datetime import datetime
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+
 
 type_map = {"T": "Temperature", "H": "Humidity"}
 
@@ -28,10 +31,10 @@ def add_uzytkownik(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         Uzytkownik.objects.create(
-            nazwa_uzytkownika=data['name'],
-            haslo=make_password(data['password']),
-            email=data['email'],
-            powiadomienie_email=data['wants_emails']
+            nazwa_uzytkownika=data["name"],
+            haslo=make_password(data["password"]),
+            email=data["email"],
+            powiadomienie_email=data["wants_emails"],
         )
         return JsonResponse({"message": "User created successfully"}, status=201)
     except Exception as e:
@@ -145,3 +148,57 @@ def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonRespon
         return JsonResponse({"measurements": data})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def login_view(request):
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+
+        try:
+            user = Uzytkownik.objects.get(nazwa_uzytkownika=username)
+            if user.check_password(password):
+                request.session["user_id"] = user.id
+                messages.success(request, "Login successful!")
+                return redirect("dashboard")
+            else:
+                messages.error(request, "Invalid username or password")
+        except Uzytkownik.DoesNotExist:
+            messages.error(request, "Invalid username or password")
+
+        return redirect("login")
+
+    return render(request, "frontend/login.html")
+
+
+def register_view(request):
+    if request.method == "POST":
+        username = request.POST.get("username")
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+        confirm_password = request.POST.get("confirmPassword")
+
+        if password != confirm_password:
+            messages.error(request, "Passwords do not match")
+            return redirect("register")
+
+        if Uzytkownik.objects.filter(email=email).exists():
+            messages.error(request, "User with this email already exists")
+            return redirect("register")
+
+        if Uzytkownik.objects.filter(nazwa_uzytkownika=username).exists():
+            messages.error(request, "User with this username already exists")
+            return redirect("register")
+
+        user = Uzytkownik(nazwa_uzytkownika=username, email=email, haslo=make_password(password))
+        user.save()
+
+        messages.success(request, "Account created successfully. You can now log in.")
+        return redirect("login")
+
+    return render(request, "frontend/register.html")
+
+
+@login_required
+def dashboard_view(request):
+    return render(request, "frontend/dashboard.html")

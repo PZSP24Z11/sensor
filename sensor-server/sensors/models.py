@@ -1,11 +1,18 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
 
 
 class Uzytkownik(models.Model):
-    nazwa_uzytkownika = models.CharField(max_length=255)
+    nazwa_uzytkownika = models.CharField(max_length=255, unique=True)
     haslo = models.CharField(max_length=255)
-    email = models.EmailField(max_length=255)
+    email = models.EmailField(max_length=255, unique=True)
     powiadomienie_email = models.BooleanField(default=False)
+
+    def set_password(self, raw_password):
+        self.haslo = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.haslo)
 
 
 class Sensor(models.Model):
