@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+from dbcreds import get_credentials
 from pathlib import Path
 import os
 
@@ -78,12 +79,14 @@ WSGI_APPLICATION = "apiserver.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+username, password = get_credentials()
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "sensor_database",
-        "USER": "root",
-        "PASSWORD": "Admin@123",
+        "USER": username,
+        "PASSWORD": password,
         "HOST": "localhost",
         "PORT": "3306",
     }
