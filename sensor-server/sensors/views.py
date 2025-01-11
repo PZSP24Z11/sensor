@@ -29,9 +29,7 @@ def add_user(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "Invalid request method"}, status=405)
 
     try:
-        print("siur")
         data = json.loads(request.body)
-        print("sparsowany siur")
         Uzytkownik.objects.create(
             nazwa_uzytkownika=data["name"],
             haslo=make_password(data["password"]),
@@ -175,6 +173,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
 
 def register_view(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
+        print("in register view")
         username = request.POST.get("username")
         email = request.POST.get("email")
         password = request.POST.get("password")
