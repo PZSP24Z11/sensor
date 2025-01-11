@@ -1,18 +1,46 @@
+from __future__ import annotations
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
 
-class Uzytkownik(models.Model):
-    nazwa_uzytkownika = models.CharField(max_length=255, unique=True)
-    haslo = models.CharField(max_length=255)
-    email = models.EmailField(max_length=255, unique=True)
-    powiadomienie_email = models.BooleanField(default=False)
+class UzytkownikManager(BaseUserManager):
+    """Manager for Uzytkownik model. Handles Uzytkownik and Uzytkownik admin creation"""
 
-    def set_password(self, raw_password):
-        self.haslo = make_password(raw_password)
+    def create_user(self, username: str, password: str = None, **extra_fields: None) -> Uzytkownik:
+        if not username:
+            raise ValueError("Nazwa użytkownika jest wymagana")
+        extra_fields.setdefault("email_notification", False)
+        extra_fields.setdefault("is_superuser", False)
+        user = self.model(username=username, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
 
-    def check_password(self, raw_password):
-        return check_password(raw_password, self.haslo)
+    def create_superuser(self, username: str, password: str = None, **extra_fields: None) -> Uzytkownik:
+        extra_fields.setdefault("is_superuser", True)
+        return self.create_user(username, password, **extra_fields)
+
+
+class Uzytkownik(AbstractBaseUser, PermissionsMixin):
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True, null=False, blank=False)
+    is_active = models.BooleanField(default=True)
+    is_superuser = models.BooleanField(default=False)
+    email_notification = models.BooleanField(default=False)
+
+    USERNAME_FIELD = "username"
+    REQUIRED_FIELDS = ["email"]
+
+    objects = UzytkownikManager()
+
+    def __str__(self) -> str:
+        return self.username
+
+    @property
+    def is_staff(self) -> bool:
+        """Wymagane przez Django Admin: traktuj is_admin jako is_staff."""
+        return self.is_superuser
 
 
 class Sensor(models.Model):
