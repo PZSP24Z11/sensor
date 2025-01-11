@@ -1,9 +1,10 @@
 from django.http import JsonResponse, HttpResponse, HttpRequest
 from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik
 from django.contrib.auth.hashers import make_password, check_password
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 import json
 from django.shortcuts import render, redirect
+from django.middleware.csrf import get_token
 import re
 import string
 import random
@@ -191,6 +192,7 @@ def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonRespon
 def register_view(request):
     if request.method == "POST":
         try:
+
             data = json.loads(request.body)
 
             username = data.get("username")
@@ -221,7 +223,7 @@ def register_view(request):
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
-@csrf_exempt
+@csrf_protect
 def login_view(request):
     if request.method == "POST":
         try:
@@ -263,5 +265,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@csrf_protect
 def dashboard_view(request: HttpRequest) -> HttpResponse:
+    print(get_token(request))
     return render(request, "frontend/dashboard.html")
