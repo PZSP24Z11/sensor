@@ -11,6 +11,7 @@ from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from apiserver.anomaly_notifier import send_anomaly_mail
+from rest_framework.decorators import api_view
 
 
 type_map = {"T": "Temperature", "H": "Humidity"}
@@ -18,8 +19,7 @@ type_map = {"T": "Temperature", "H": "Humidity"}
 
 def _get_users_with_notifications_by_mac(mac_address: str) -> Uzytkownik.objects:
     return Uzytkownik.objects.filter(
-        powiadomienie_email=True,
-        uzytkowniksensor__sensor__adres_MAC=mac_address
+        powiadomienie_email=True, uzytkowniksensor__sensor__adres_MAC=mac_address
     ).distinct()
 
 
@@ -187,55 +187,75 @@ def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonRespon
         return JsonResponse({"error": str(e)}, status=500)
 
 
-def login_view(request: HttpRequest) -> HttpResponse:
+@csrf_exempt
+def register_view(request):
     if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
-
         try:
-            user = Uzytkownik.objects.get(nazwa_uzytkownika=username)
-            if user.check_password(password):
-                request.session["user_id"] = user.id
-                messages.success(request, "Login successful!")
-                return redirect("dashboard")
-            else:
-                messages.error(request, "Invalid username or password")
-        except Uzytkownik.DoesNotExist:
-            messages.error(request, "Invalid username or password")
+            data = json.loads(request.body)
 
-        return redirect("login")
+            username = data.get("username")
+            email = data.get("email")
+            password = data.get("password")
 
-    return render(request, "frontend/login.html")
+            if not username or not email or not password:
+                return JsonResponse({"error": "Missing required fields"}, status=400)
+
+            if Uzytkownik.objects.filter(email=email).exists():
+                return JsonResponse({"error": "User with this email already exists"}, status=400)
+
+            if Uzytkownik.objects.filter(nazwa_uzytkownika=username).exists():
+                return JsonResponse({"error": "User with this username already exists"}, status=400)
+
+            user = Uzytkownik(nazwa_uzytkownika=username, email=email)
+            user.set_password(password)
+            user.save()
+
+            return JsonResponse({"message": "User created successfully"}, status=201)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
-def register_view(request: HttpRequest) -> HttpResponse:
-    print("register view")
+@csrf_exempt
+def login_view(request):
     if request.method == "POST":
-        print("in register view")
-        username = request.POST.get("username")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        confirm_password = request.POST.get("confirmPassword")
+        try:
+            data = json.loads(request.body)
 
-        if password != confirm_password:
-            messages.error(request, "Passwords do not match")
-            return redirect("register")
+            username = data.get("username")
+            password = data.get("password")
 
-        if Uzytkownik.objects.filter(email=email).exists():
-            messages.error(request, "User with this email already exists")
-            return redirect("register")
+            if not username or not password:
+                return JsonResponse({"error": "Missing required fields"}, status=400)
 
-        if Uzytkownik.objects.filter(nazwa_uzytkownika=username).exists():
-            messages.error(request, "User with this username already exists")
-            return redirect("register")
+            try:
+                user = Uzytkownik.objects.get(nazwa_uzytkownika=username)
 
-        user = Uzytkownik(nazwa_uzytkownika=username, email=email, haslo=make_password(password))
-        user.save()
+                if user.check_password(password):
+                    return JsonResponse({"message": "Login successful", "user_id": user.id}, status=200)
+                else:
+                    return JsonResponse({"error": "Invalid credentials"}, status=400)
 
-        messages.success(request, "Account created successfully. You can now log in.")
-        return redirect("login")
+            except Uzytkownik.DoesNotExist:
+                return JsonResponse({"error": "Invalid credentials"}, status=400)
 
-    return render(request, "frontend/register.html")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@api_view(["GET"])
+def get_sensors(request):
+    return JsonResponse({"sensors": ["sensor1", "sensor2"]})
 
 
 def index_view(request: HttpRequest) -> HttpResponse:

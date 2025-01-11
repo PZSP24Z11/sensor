@@ -17,7 +17,19 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from sensors.views import get_last_pomiar, sensor_register_view, measurements_register_view, register_view, login_view, index_view, add_user, force_anomaly
+from sensors.views import (
+    get_last_pomiar,
+    sensor_register_view,
+    measurements_register_view,
+    register_view,
+    login_view,
+    index_view,
+    add_user,
+    force_anomaly,
+    get_sensors,
+    register_view,
+    login_view,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -27,7 +39,7 @@ urlpatterns = [
     path("api/force_anomaly/", force_anomaly, name="force_anomaly"),
     path("sensor/register/", sensor_register_view, name="sensor_register"),
     path("sensor/measurements/", measurements_register_view, name="measurements_register"),
-    path("sensors/", include("sensors.urls")),
-    path("register/", register_view, name="register"),
-    path("login/", login_view, name="login"),
+    path("api/register/", register_view, name="api-register"),
+    path("api/login/", login_view, name="api-login"),
+    path("api/sensors/", get_sensors, name="api-sensors"),
 ]
