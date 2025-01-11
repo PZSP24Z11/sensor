@@ -10,9 +10,22 @@ import random
 from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from apiserver.anomaly_notifier import send_anomaly_mail
 
 
 type_map = {"T": "Temperature", "H": "Humidity"}
+
+
+def _get_users_with_notifications_by_mac(mac_address: str) -> Uzytkownik.objects:
+    return Uzytkownik.objects.filter(
+        powiadomienie_email=True,
+        uzytkowniksensor__sensor__adres_MAC=mac_address
+    ).distinct()
+
+
+def handle_anomaly(sensor: Sensor) -> None:
+    users = _get_users_with_notifications_by_mac(sensor.adres_MAC)
+    send_anomaly_mail(sensor, users)
 
 
 def get_last_pomiar(_: HttpRequest) -> JsonResponse:
@@ -21,6 +34,30 @@ def get_last_pomiar(_: HttpRequest) -> JsonResponse:
         return JsonResponse({"value": latest_record.wartosc_pomiaru})
     except Pomiar.DoesNotExist:
         return JsonResponse({"error": "No data found"}, status=404)
+
+
+# TEST ENDPOINT
+@csrf_exempt
+def force_anomaly(request: HttpRequest) -> JsonResponse:
+    print("in users by mac")
+    if request.method != "GET":
+        return JsonResponse({"error": "Invalid resquest method"}, status=405)
+
+    print("passed GET check")
+
+    try:
+        print("in try")
+        mac_address = request.GET.get("mac_address")
+        sensor = Sensor.objects.get(adres_MAC=mac_address)
+        handle_anomaly(sensor)
+        print("request body loaded")
+        users = _get_users_with_notifications_by_mac(mac_address)
+        print("users received")
+        users = [user.email for user in users]
+        users = ", ".join(users)
+        return JsonResponse({"users": users})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
 
 
 @csrf_exempt
@@ -172,6 +209,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
 
 
 def register_view(request: HttpRequest) -> HttpResponse:
+    print("register view")
     if request.method == "POST":
         print("in register view")
         username = request.POST.get("username")

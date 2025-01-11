@@ -17,13 +17,14 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from sensors.views import get_last_pomiar, sensor_register_view, measurements_register_view, register_view, login_view, index_view
+from sensors.views import get_last_pomiar, sensor_register_view, measurements_register_view, register_view, login_view, index_view, add_user, force_anomaly
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", index_view, name="index"),
     path("api/last_value/", get_last_pomiar, name="last_value"),
-    #path("api/add_user/", add_user, name="add_user"),
+    path("api/add_user/", add_user, name="add_user"),
+    path("api/force_anomaly/", force_anomaly, name="force_anomaly"),
     path("sensor/register/", sensor_register_view, name="sensor_register"),
     path("sensor/measurements/", measurements_register_view, name="measurements_register"),
     path("sensors/", include("sensors.urls")),
