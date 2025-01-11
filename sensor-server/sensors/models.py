@@ -39,7 +39,6 @@ class Uzytkownik(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_staff(self) -> bool:
-        """Wymagane przez Django Admin: traktuj is_admin jako is_staff."""
         return self.is_superuser
 
 

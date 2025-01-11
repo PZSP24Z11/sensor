@@ -1,5 +1,6 @@
 from django.http import JsonResponse, HttpResponse, HttpRequest
-from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik
+from django.utils.decorators import method_decorator
+from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik, UzytkownikManager
 from django.contrib.auth.hashers import make_password, check_password
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 import json
@@ -13,6 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from apiserver.anomaly_notifier import send_anomaly_mail
 from rest_framework.decorators import api_view
+from django.views import View
 
 
 type_map = {"T": "Temperature", "H": "Humidity"}
@@ -188,40 +190,35 @@ def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonRespon
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@csrf_exempt
-def register_view(request):
-    pass
-    # if request.method == "POST":
-    #     try:
+@method_decorator(csrf_exempt, name="dispatch")
+class RegisterUserView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        try:
+            data = json.loads(request.body)
+            username = data.get("username")
+            password = data.get("password")
+            email = data.get("email")
+            status = 200
+            message = "Client registered"
 
-    #         data = json.loads(request.body)
+            if not all((username, password, email)):
+                status = 400
+                message = "Missing one or more require fields"
+            elif Uzytkownik.objects.filter(username=username).exists():
+                status = 400
+                message = f"Username {username} already exist"
+            else:
+                Uzytkownik.objects.create_user(username, password, email=email)
+        except json.JSONDecodeError as e:
+            print(e)
+            status = 400
+            message = str(e)
+        except Exception as e:
+            print(e)
+            status = 500
+            message = "Internal error creating user"
 
-    #         username = data.get("username")
-    #         email = data.get("email")
-    #         password = data.get("password")
-
-    #         if not username or not email or not password:
-    #             return JsonResponse({"error": "Missing required fields"}, status=400)
-
-    #         if Uzytkownik.objects.filter(email=email).exists():
-    #             return JsonResponse({"error": "User with this email already exists"}, status=400)
-
-    #         if Uzytkownik.objects.filter(nazwa_uzytkownika=username).exists():
-    #             return JsonResponse({"error": "User with this username already exists"}, status=400)
-
-    #         user = Uzytkownik(nazwa_uzytkownika=username, email=email)
-    #         user.set_password(password)
-    #         user.save()
-
-    #         return JsonResponse({"message": "User created successfully"}, status=201)
-
-    #     except json.JSONDecodeError:
-    #         return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    #     except Exception as e:
-    #         return JsonResponse({"error": str(e)}, status=500)
-
-    # return JsonResponse({"error": "Invalid request method"}, status=405)
+        return JsonResponse(status=status, data={"message": message})
 
 
 @csrf_protect
