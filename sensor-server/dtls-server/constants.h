@@ -41,7 +41,7 @@
 #define MEASUREMENTS_REJECTED       3
 #define ERROR_IN_API_COMMUNICATION  -1
 
-#define API_REQUEST_ENDPOINT        "http://localhost:8000/sensor/register/"
-#define API_MEASUREMENTS_ENDPOINT   "http://localhost:8000/sensor/measurements/"
+#define API_REQUEST_ENDPOINT        "http://localhost:8080/sensor/register/"
+#define API_MEASUREMENTS_ENDPOINT   "http://localhost:8080/sensor/measurements/"
 
 #endif // CONSTANTS_H

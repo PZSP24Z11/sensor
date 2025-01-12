@@ -1,0 +1,166 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin View Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+
+<body class="gradient-custom">
+    <div class="container py-5">
+        <h2 class="text-center mb-4">Sensor Admin View Dashboard</h2>
+
+        <div class="d-flex justify-content-center mb-3">
+            <button class="btn btn-outline-dark mx-1">Temperature</button>
+            <button class="btn btn-outline-dark mx-1">Humidity</button>
+            <button class="btn btn-outline-dark mx-1">Week</button>
+            <button class="btn btn-outline-dark mx-1">Day</button>
+            <button class="btn btn-outline-dark mx-1">Hour</button>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card p-3">
+                    <h5>Temperature</h5>
+                    <canvas id="sensorChart"></canvas>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <div class="bg-dark text-white rounded p-3">
+                        <h5>Accessible Sensors</h5>
+                    </div>
+                    
+                    <div id="sensorList">
+                        {%for sensor in sensors %}
+                        <button class="sensor-card w-100"
+                            data-id="{{ sensor.id }}"
+                            data-nazwa="{{ sensor.nazwa_sensora }}"
+                            data-mac="{{ sensor.adres_MAC }}"
+                            <strong>{{ sensor.nazwa_sensora }}</strong><br>
+                            <small>{{ sensor.adres_MAC }}</small><br>
+                            <small>id: (for dev){{sensor.id}}</small>
+                            <small>Measures:</small>
+                            {% for measurement_type in sensor.measurement_types %}
+                                <small>{{ measurement_type.nazwa_pomiaru }}{% if not forloop.last %}, {% endif %}</small>
+                            {% endfor %}
+                        </button>
+                        {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% for sensor in sensors %}
+        {{ sensor.measurement_types|json_script:"sensor_"|add:sensor.id }}
+    {% endfor %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sensorCards = document.querySelectorAll('.sensor-card');
+        let selectedSensorCard = null
+        sensorCards.forEach(card => {
+            card.addEventListener('click', function() {
+                sensorCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedSensorCard = card
+            
+                const sensor_id = card.getAttribute('data-id')
+                fetch('/latest_sensor_measurements/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        id: sensor_id,
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                    updateChart(data.measurements);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            });
+        });
+    
+    // symuluje klikniecie w pierwszy sensor o ile istnieje
+        if (sensorCards.length > 0) {
+            sensorCards[0].click();
+        }
+
+        // okresowe klikanie
+        setInterval(() => {
+            if (selectedSensorCard) {
+                selectedSensorCard.click();
+            }
+        }, 10000); // 10 sekund
+
+
+        function updateChart(measurements) {
+            console.log("jestem w updateChart")
+            console.log(measurements)
+            const labels = []
+            const datasets = []
+
+            for (const [type, values] of Object.entries(measurements)) {
+                console.log("w forze")
+                console.log(type)
+                const data = values.map(measurement => measurement.wartosc_pomiaru / 100);
+                const label = type;
+                const borderColor = 'black';
+                const backgroundColor = 'rgba(0, 0, 0, 0.1)';
+                
+                datasets.push({
+                    label: label,
+                    data: data,
+                    borderColor: borderColor,
+                    backgroundColor: backgroundColor,
+                    borderWidth: 2
+                });
+                if (labels.length === 0) {
+                    values.forEach(measurement => {
+                        labels.push(new Date(measurement.data_pomiaru).toLocaleTimeString());
+                    });
+                }
+            }
+
+            sensorChart.data.labels = labels;
+            sensorChart.data.datasets = datasets;
+            sensorChart.update();
+        }
+    });
+    var ctx = document.getElementById('sensorChart').getContext('2d');
+    var sensorChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [],
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    suggestedMin: 5,
+                    suggestedMax: 35
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+
+</html>

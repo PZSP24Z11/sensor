@@ -138,3 +138,7 @@ LOGIN_REDIRECT_URL = "/dashboard/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8080", "http://localhost:8080"]
+
+AUTH_USER_MODEL = "sensors.Uzytkownik"
