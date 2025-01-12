@@ -1,7 +1,6 @@
 from __future__ import annotations
 from django.db import models
-from django.contrib.auth.hashers import make_password, check_password
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractUser, AbstractBaseUser, BaseUserManager, PermissionsMixin, User
 
 
 class UzytkownikManager(BaseUserManager):
@@ -78,5 +77,5 @@ class Request(models.Model):
     )
     request_date = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Request for {self.nazwa_sensora} ({self.adres_MAC}) - {self.status}"

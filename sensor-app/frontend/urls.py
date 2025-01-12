@@ -18,11 +18,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
-from .views import dashboard_view, login_view, register_view
+from .views import dashboard_view, login_view, RegisterUserView
 
 urlpatterns = [
     path("", views.index, name="index"),
-    path("register/", register_view, name="register"),
+    path("register/", RegisterUserView.as_view(), name="register"),
     path("login/", login_view, name="login"),
     path("dashboard/", dashboard_view, name="dashboard"),
 ]

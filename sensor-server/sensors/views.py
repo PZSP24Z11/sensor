@@ -224,34 +224,6 @@ class RegisterUserView(View):
 @csrf_protect
 def login_view(request):
     pass
-    # if request.method == "POST":
-    #     try:
-    #         data = json.loads(request.body)
-
-    #         username = data.get("username")
-    #         password = data.get("password")
-
-    #         if not username or not password:
-    #             return JsonResponse({"error": "Missing required fields"}, status=400)
-
-    #         try:
-    #             user = Uzytkownik.objects.get(nazwa_uzytkownika=username)
-
-    #             if user.check_password(password):
-    #                 return JsonResponse({"message": "Login successful", "user_id": user.id}, status=200)
-    #             else:
-    #                 return JsonResponse({"error": "Invalid credentials"}, status=400)
-
-    #         except Uzytkownik.DoesNotExist:
-    #             return JsonResponse({"error": "Invalid credentials"}, status=400)
-
-    #     except json.JSONDecodeError:
-    #         return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    #     except Exception as e:
-    #         return JsonResponse({"error": str(e)}, status=500)
-
-    # return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
 @api_view(["GET"])
