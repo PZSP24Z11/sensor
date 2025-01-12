@@ -51,7 +51,7 @@ void *mock_measurements_thread_function(void *arg)
 {
     LOG(LOG_INFO, "Started mock measurements thread\n");
 	(void)arg;
-    temp = 123;
+    temp = 153;
     hum = 321;
     char temp_str[32];
     char hum_str[32];
@@ -60,8 +60,8 @@ void *mock_measurements_thread_function(void *arg)
 
     while (1)    
     {
-        temp++;
-        hum++;
+        temp += 20;
+        hum += 10;
         
         sprintf(temp_str, "%d", temp);
         sprintf(hum_str, "%d", hum);

@@ -1,10 +1,11 @@
 from django.http import JsonResponse, HttpResponse, HttpRequest
 from django.utils.decorators import method_decorator
-from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik, UzytkownikManager
+from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik, UzytkownikManager, UzytkownikSensor
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.sessions.models import Session
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.contrib.auth import authenticate, login
+from typing import Optional
 import json
 from django.shortcuts import render, redirect
 from django.middleware.csrf import get_token
@@ -12,15 +13,60 @@ import re
 import string
 import random
 from datetime import datetime
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from apiserver.anomaly_notifier import send_anomaly_mail
-from rest_framework.decorators import api_view
 from django.views import View
-from django.core.exceptions import ObjectDoesNotExist
 
 
 type_map = {"T": "Temperature", "H": "Humidity"}
+
+
+def get_user_from_session(session_key: str) -> Uzytkownik:
+    """Get user from session key
+    :raises:Session.DoesNotExist: remember to handle it
+    """
+    session = Session.objects.get(session_key=session_key)
+    user_id = session.get_decoded().get("_auth_user_id")
+    user = Uzytkownik.objects.get(id=user_id)
+    return user
+
+
+def get_measurement_types(sensor_id: int) -> Optional[list[str]]:
+    try:
+        sensor = Sensor.objects.get(id=sensor_id)
+        measurement_types = TypPomiaru.objects.filter(
+            id__in=SensorTypPomiaru.objects.filter(sensor=sensor).values_list("typ_pomiaru_id", flat=True)
+        )
+        return list(measurement_types.values())
+    except Sensor.DoesNotExist:
+        return None
+
+
+def get_latest_measurements(sensor_id: int, max: int = 7):
+
+    sensor = Sensor.objects.get(id=sensor_id)
+    measurement_types = TypPomiaru.objects.filter(
+        id__in=SensorTypPomiaru.objects.filter(sensor=sensor).values_list("typ_pomiaru_id", flat=True)
+    )
+
+    latest_measurements = {}
+    for measurement_type in measurement_types:
+        measurements = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type).order_by("-data_pomiaru")[
+            :max
+        ]
+        latest_measurements[measurement_type.nazwa_pomiaru] = list(measurements.values())[::-1]
+    return latest_measurements
+
+
+def validate_user_permission(user_id: int, sensor_id: str) -> bool:
+    try:
+        user = Uzytkownik.objects.get(id=user_id)
+        if user.is_superuser:
+            return True
+
+        return UzytkownikSensor.objects.filter(uzytkownik_id=user_id, sensor_id=sensor_id).exists()
+    except Uzytkownik.DoesNotExist:
+        return False
 
 
 def _get_users_with_notifications_by_mac(mac_address: str) -> Uzytkownik.objects:
@@ -262,8 +308,7 @@ class LogoutView(View):
             else:
                 try:
                     session = Session.objects.get(session_key=session_id)
-                    print("usuwamy :p")
-                    session.delete()  # Usunięcie sesji
+                    session.delete()
                 except Session.DoesNotExist:
                     status, message = 400, "Invalid session ID"
         except json.JSONDecodeError as e:
@@ -283,11 +328,7 @@ class ValidateSessionView(View):
         print(session_id)
         try:
             if session_id:
-                session = Session.objects.get(session_key=session_id)
-                print("got session")
-                user_id = session.get_decoded().get("_auth_user_id")
-                print("got user id")
-                user = Uzytkownik.objects.get(id=user_id)
+                user = get_user_from_session(session_id)
                 is_admin = user.is_superuser
             else:
                 status, is_valid = 400, False
@@ -300,17 +341,57 @@ class ValidateSessionView(View):
         return JsonResponse(status=status, data={"is_valid": is_valid, "is_admin": is_admin})
 
 
-@api_view(["GET"])
-def get_sensors(request):
-    return JsonResponse({"sensors": ["sensor1", "sensor2"]})
+@method_decorator(csrf_exempt, name="dispatch")
+class GetSensorsView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+
+        if not session_id:
+            return JsonResponse(status=400, data={"message": "Bad request: session_id needed"})
+        try:
+            user = get_user_from_session(session_id)
+            if user.is_superuser:
+                sensors = Sensor.objects.all()
+            else:
+                sensors = Sensor.objects.filter(
+                    id__in=UzytkownikSensor.objects.filter(uzytkownik=user).values_list("sensor", flat=True)
+                )
+            sensors = list(sensors.values())
+            for sensor in sensors:
+                sensor["measurement_types"] = get_measurement_types(sensor["id"])
+
+            return JsonResponse(status=200, data={"sensor_list": sensors})
+        except Session.DoesNotExist:
+            return JsonResponse(status=401, data={"message": "Invalid session_id"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class LatestSensorMeasurementsView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+
+        if not session_id:
+            return JsonResponse(status=400, data={"message": "Bad request: session_id needed"})
+        try:
+            user = get_user_from_session(session_id)
+
+            data = json.loads(request.body)
+            sensor_id = data.get("sensor_id")
+            if not validate_user_permission(user.id, sensor_id):
+                return JsonResponse(status=401, data={"message": "User doesnt have permission"})
+            measurements = get_latest_measurements(sensor_id)
+            return JsonResponse(status=200, data={"measurements": measurements})
+        except Session.DoesNotExist:
+            return JsonResponse(status=401, data={"message": "Invalid session_id"})
+        except Sensor.DoesNotExist:
+            return JsonResponse(status=400, data={"message": "Sensor does not exist"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
 
 
 def index_view(request: HttpRequest) -> HttpResponse:
     return render(request, "frontend/index.html")
-
-
-@login_required
-@csrf_protect
-def dashboard_view(request: HttpRequest) -> HttpResponse:
-    print(get_token(request))
-    return render(request, "frontend/dashboard.html")

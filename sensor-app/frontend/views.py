@@ -1,4 +1,6 @@
 import requests
+import json
+from typing import Optional, TypedDict
 from django.http import JsonResponse, HttpResponse, HttpRequest
 from django.views import View
 from django.contrib import messages
@@ -8,6 +10,21 @@ from django.middleware.csrf import get_token
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 
 API_URL = "http://127.0.0.1:8080/api/"
+
+
+class Sensor(TypedDict):
+    id: int
+    nazwa_sensora: str
+    adres_MAC: str
+
+
+def get_sensor_list(session_id) -> Optional[list[Sensor]]:
+    try:
+        response = requests.get(f"{API_URL}sensors/", cookies={"session_id": session_id})
+        return response.json()
+    except Exception as e:
+        print(e)
+        return None
 
 
 class RegisterUserView(View):
@@ -76,7 +93,6 @@ class AdminView(View):
 
         try:
             response = requests.get(f"{API_URL}validate_session/", cookies={"session_id": session_id})
-
             if response.status_code < 400:
                 response_data = response.json()
                 if not all((response_data["is_valid"], response_data["is_admin"])):
@@ -84,13 +100,13 @@ class AdminView(View):
             else:
                 messages.error(request, "Invalid session, logged out")
                 return redirect("login")
-
         except Exception as e:
             print(e)
             messages.error(request, "Error communicating with API")
             return redirect("login")
 
-        return render(request, self.content)
+        sensors = get_sensor_list(session_id)
+        return render(request, self.content, {"sensors": sensors["sensor_list"]})
 
 
 class DashboardView(View):
@@ -117,6 +133,29 @@ class DashboardView(View):
             return redirect("login")
 
         return render(request, self.content)
+
+
+class LatestSensorMeasurementeView(View):
+    def post(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login before viewing sensors")
+            return redirect("login")
+        try:
+            data = json.loads(request.body)
+            sensor_id = data.get("id")
+            response = requests.post(
+                f"{API_URL}latest_sensor_measurements/",
+                json={"sensor_id": sensor_id},
+                cookies={"session_id": session_id},
+            )
+
+            if response.status_code < 400:
+                response_data = response.json()
+                return JsonResponse(status=response.status_code, data={"measurements": response_data["measurements"]})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal error"})
 
 
 def index(request):

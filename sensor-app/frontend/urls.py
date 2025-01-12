@@ -17,7 +17,7 @@ Including another URLconf
 
 from django.urls import path
 from . import views
-from .views import RegisterUserView, LoginView, AdminView, DashboardView
+from .views import RegisterUserView, LoginView, AdminView, DashboardView, LatestSensorMeasurementeView
 
 urlpatterns = [
     path("", views.index, name="index"),
@@ -25,4 +25,5 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("admin/", AdminView.as_view(), name="admin"),
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("latest_sensor_measurements/", LatestSensorMeasurementeView.as_view(), name="latest-sensor-measurements"),
 ]

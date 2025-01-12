@@ -8,7 +8,6 @@
     <title>Admin View Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 </head>
 
@@ -34,67 +33,133 @@
 
             <div class="col-md-4">
                 <div class="card p-3">
-                    <h5>Active Sensors</h5>
-                    <button class="btn btn-dark btn-sm mb-2">Add Sensor</button>
-
+                    <div class="bg-dark text-white rounded p-3">
+                        <h5>Accessible Sensors</h5>
+                    </div>
+                    
                     <div id="sensorList">
-                        <div class="sensor-card selected">
-                            <strong>Warszawa</strong><br>
-                            <small>85.14.162.92</small><br>
-                            24.3°C / 47%
-                        </div>
-                        <div class="sensor-card">
-                            <strong>Łódź</strong><br>
-                            <small>80.25.98.168</small><br>
-                            24.7°C / 46%
-                        </div>
-                        <div class="sensor-card">
-                            <strong>Gdańsk</strong><br>
-                            <small>87.170.20.152</small><br>
-                            26.7°C / 52%
-                        </div>
-                        <div class="sensor-card">
-                            <strong>Rzeszów</strong><br>
-                            <small>96.86.50.170</small><br>
-                            24.3°C / 45%
-                        </div>
-                        <div class="sensor-card">
-                            <strong>Białystok</strong><br>
-                            <small>81.231.60.120</small><br>
-                            26.9°C / 49%
+                        {%for sensor in sensors %}
+                        <button class="sensor-card w-100"
+                            data-id="{{ sensor.id }}"
+                            data-nazwa="{{ sensor.nazwa_sensora }}"
+                            data-mac="{{ sensor.adres_MAC }}"
+                            <strong>{{ sensor.nazwa_sensora }}</strong><br>
+                            <small>{{ sensor.adres_MAC }}</small><br>
+                            <small>id: (for dev){{sensor.id}}</small>
+                            <small>Measures:</small>
+                            {% for measurement_type in sensor.measurement_types %}
+                                <small>{{ measurement_type.nazwa_pomiaru }}{% if not forloop.last %}, {% endif %}</small>
+                            {% endfor %}
+                        </button>
+                        {% endfor %}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    
+    {% for sensor in sensors %}
+        {{ sensor.measurement_types|json_script:"sensor_"|add:sensor.id }}
+    {% endfor %}
 
-    <script>
-        var ctx = document.getElementById('sensorChart').getContext('2d');
-        var sensorChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ["00:00", "06:00", "12:00", "18:00", "22:00", "24:00"],
-                datasets: [{
-                    label: 'Temperature (°C)',
-                    data: [12, 8, 18, 24, 22, 15],
-                    borderColor: 'black',
-                    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sensorCards = document.querySelectorAll('.sensor-card');
+        let selectedSensorCard = null
+        sensorCards.forEach(card => {
+            card.addEventListener('click', function() {
+                sensorCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedSensorCard = card
+            
+                const sensor_id = card.getAttribute('data-id')
+                fetch('/latest_sensor_measurements/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        id: sensor_id,
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                    updateChart(data.measurements);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            });
+        });
+    
+    // symuluje klikniecie w pierwszy sensor o ile istnieje
+        if (sensorCards.length > 0) {
+            sensorCards[0].click();
+        }
+
+        // okresowe klikanie
+        setInterval(() => {
+            if (selectedSensorCard) {
+                selectedSensorCard.click();
+            }
+        }, 10000); // 10 sekund
+
+
+        function updateChart(measurements) {
+            console.log("jestem w updateChart")
+            console.log(measurements)
+            const labels = []
+            const datasets = []
+
+            for (const [type, values] of Object.entries(measurements)) {
+                console.log("w forze")
+                console.log(type)
+                const data = values.map(measurement => measurement.wartosc_pomiaru / 100);
+                const label = type;
+                const borderColor = 'black';
+                const backgroundColor = 'rgba(0, 0, 0, 0.1)';
+                
+                datasets.push({
+                    label: label,
+                    data: data,
+                    borderColor: borderColor,
+                    backgroundColor: backgroundColor,
                     borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        suggestedMin: 5,
-                        suggestedMax: 35
-                    }
+                });
+                if (labels.length === 0) {
+                    values.forEach(measurement => {
+                        labels.push(new Date(measurement.data_pomiaru).toLocaleTimeString());
+                    });
                 }
             }
-        });
-    </script>
+
+            sensorChart.data.labels = labels;
+            sensorChart.data.datasets = datasets;
+            sensorChart.update();
+        }
+    });
+    var ctx = document.getElementById('sensorChart').getContext('2d');
+    var sensorChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [],
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    suggestedMin: 5,
+                    suggestedMax: 35
+                }
+            }
+        }
+    });
+</script>
 
 </body>
 
