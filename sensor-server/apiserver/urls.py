@@ -21,12 +21,13 @@ from sensors.views import (
     get_last_pomiar,
     sensor_register_view,
     measurements_register_view,
-    login_view,
     index_view,
     add_user,
     force_anomaly,
     get_sensors,
     RegisterUserView,
+    LoginView,
+    LogoutView,
 )
 
 urlpatterns = [
@@ -38,6 +39,7 @@ urlpatterns = [
     path("sensor/register/", sensor_register_view, name="sensor_register"),
     path("sensor/measurements/", measurements_register_view, name="measurements_register"),
     path("api/register_user/", RegisterUserView.as_view(), name="api-register-user"),
-    path("api/login/", login_view, name="api-login"),
+    path("api/login/", LoginView.as_view(), name="api-login"),
+    path("api/logout/", LogoutView.as_view(), name="api-logout"),
     path("api/sensors/", get_sensors, name="api-sensors"),
 ]

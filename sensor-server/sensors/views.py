@@ -2,7 +2,9 @@ from django.http import JsonResponse, HttpResponse, HttpRequest
 from django.utils.decorators import method_decorator
 from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik, UzytkownikManager
 from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.sessions.models import Session
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.contrib.auth import authenticate, login
 import json
 from django.shortcuts import render, redirect
 from django.middleware.csrf import get_token
@@ -195,11 +197,8 @@ class RegisterUserView(View):
     def post(self, request: HttpRequest) -> JsonResponse:
         try:
             data = json.loads(request.body)
-            username = data.get("username")
-            password = data.get("password")
-            email = data.get("email")
-            status = 200
-            message = "Client registered"
+            username, password, email = data.get("username"), data.get("password"), data.get("email")
+            status, message = 200, "Client registered"
 
             if not all((username, password, email)):
                 status = 400
@@ -221,9 +220,57 @@ class RegisterUserView(View):
         return JsonResponse(status=status, data={"message": message})
 
 
-@csrf_protect
-def login_view(request):
-    pass
+@method_decorator(csrf_exempt, name="dispatch")
+class LoginView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        try:
+            data = json.loads(request.body)
+            username, password = data.get("username"), data.get("password")
+            status, message, session_id = 200, "Login successful", ""
+
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                print(user)
+                login(request, user)
+                session_id = request.session.session_key
+                if not session_id:
+                    request.session.create()
+                    session_id = request.session.session_key
+            else:
+                status, message = 401, "Invalid credentials"
+        except json.JSONDecodeError as e:
+            status, message = 400, str(e)
+        except Exception as e:
+            print(e)
+            status, message = 500, "Internal server error"
+
+        return JsonResponse(status=status, data={"message": message, "session_id": session_id})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class LogoutView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        try:
+            data = json.loads(request.body)
+            session_id = data.get("session_id")
+            status, message = 200, "Logout successful"
+
+            if not session_id:
+                status, message = 400, "Session ID is required"
+            else:
+                try:
+                    session = Session.objects.get(session_key=session_id)
+                    print("usuwamy :p")
+                    session.delete()  # Usunięcie sesji
+                except Session.DoesNotExist:
+                    status, message = 400, "Invalid session ID"
+        except json.JSONDecodeError as e:
+            status, message = 400, str(e)
+        except Exception as e:
+            print(e)
+            status, message = 500, "Internal server error"
+
+        return JsonResponse(status=status, data={"message": message})
 
 
 @api_view(["GET"])
