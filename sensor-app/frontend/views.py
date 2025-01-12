@@ -10,8 +10,9 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 API_URL = "http://127.0.0.1:8080/api/"
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 class RegisterUserView(View):
+    page = "fronend/register.html"
+
     def post(self, request: HttpRequest) -> HttpResponse:
         username = request.POST["username"]
         email = request.POST["email"]
@@ -32,6 +33,50 @@ class RegisterUserView(View):
 
     def get(self, request: HttpRequest) -> HttpResponse:
         return render(request, "frontend/register.html")
+
+
+class LoginView(View):
+    content = "frontend/login.html"
+
+    def post(self, request: HttpResponse) -> HttpResponse:
+        username, password = request.POST["username"], request.POST["password"]
+
+        try:
+            response = requests.post(f"{API_URL}login/", json={"username": username, "password": password})
+
+            if response.status_code < 400:
+                response_data = response.json()
+                session_id = response_data["session_id"]
+                is_admin = response_data["is_admin"]
+                next_page = "admin" if is_admin else "dashboard"
+                if session_id:
+                    response = redirect(next_page)
+                    # for development
+                    response.set_cookie("session_id", session_id, httponly=True, secure=False)
+                    return response
+
+        except Exception as e:
+            print(e)
+
+        messages.error(request, "Login failed")
+        return render(request, self.content)
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        return render(request, self.content)
+
+
+class AdminView(View):
+    content = "frontend/admin.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        return render(request, self.content)
+
+
+class DashboardView(View):
+    content = "frontend/dashboard.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        return render(request, self.content)
 
 
 def login_view(request):

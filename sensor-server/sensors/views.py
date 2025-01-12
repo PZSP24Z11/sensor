@@ -244,7 +244,9 @@ class LoginView(View):
             print(e)
             status, message = 500, "Internal server error"
 
-        return JsonResponse(status=status, data={"message": message, "session_id": session_id})
+        return JsonResponse(
+            status=status, data={"message": message, "session_id": session_id, "is_admin": user.is_superuser}
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
