@@ -17,6 +17,7 @@ from django.contrib.auth.decorators import login_required
 from apiserver.anomaly_notifier import send_anomaly_mail
 from rest_framework.decorators import api_view
 from django.views import View
+from django.core.exceptions import ObjectDoesNotExist
 
 
 type_map = {"T": "Temperature", "H": "Humidity"}
@@ -230,7 +231,6 @@ class LoginView(View):
 
             user = authenticate(request, username=username, password=password)
             if user is not None:
-                print(user)
                 login(request, user)
                 session_id = request.session.session_key
                 if not session_id:
@@ -273,6 +273,31 @@ class LogoutView(View):
             status, message = 500, "Internal server error"
 
         return JsonResponse(status=status, data={"message": message})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ValidateSessionView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        status, is_valid, is_admin = 200, True, False
+        session_id = request.COOKIES.get("session_id")
+        print(session_id)
+        try:
+            if session_id:
+                session = Session.objects.get(session_key=session_id)
+                print("got session")
+                user_id = session.get_decoded().get("_auth_user_id")
+                print("got user id")
+                user = Uzytkownik.objects.get(id=user_id)
+                is_admin = user.is_superuser
+            else:
+                status, is_valid = 400, False
+        except Session.DoesNotExist:
+            status, is_valid = 401, False
+        except Exception as e:
+            print(e)
+            status = 500
+
+        return JsonResponse(status=status, data={"is_valid": is_valid, "is_admin": is_admin})
 
 
 @api_view(["GET"])

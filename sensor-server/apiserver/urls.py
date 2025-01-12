@@ -28,6 +28,7 @@ from sensors.views import (
     RegisterUserView,
     LoginView,
     LogoutView,
+    ValidateSessionView,
 )
 
 urlpatterns = [
@@ -41,5 +42,6 @@ urlpatterns = [
     path("api/register_user/", RegisterUserView.as_view(), name="api-register-user"),
     path("api/login/", LoginView.as_view(), name="api-login"),
     path("api/logout/", LogoutView.as_view(), name="api-logout"),
+    path("api/validate_session/", ValidateSessionView.as_view(), name="api-validate-session"),
     path("api/sensors/", get_sensors, name="api-sensors"),
 ]

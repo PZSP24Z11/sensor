@@ -69,6 +69,27 @@ class AdminView(View):
     content = "frontend/admin.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login before viewing sensors")
+            return redirect("login")
+
+        try:
+            response = requests.get(f"{API_URL}validate_session/", cookies={"session_id": session_id})
+
+            if response.status_code < 400:
+                response_data = response.json()
+                if not all((response_data["is_valid"], response_data["is_admin"])):
+                    return redirect("login")
+            else:
+                messages.error(request, "Invalid session, logged out")
+                return redirect("login")
+
+        except Exception as e:
+            print(e)
+            messages.error(request, "Error communicating with API")
+            return redirect("login")
+
         return render(request, self.content)
 
 
@@ -76,44 +97,26 @@ class DashboardView(View):
     content = "frontend/dashboard.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login before viewing sensors")
+            return redirect("login")
+
+        try:
+            response = requests.get(f"{API_URL}validate_session/", cookies={"session_id": session_id})
+
+            if response.status_code < 400:
+                response_data = response.json()
+                if not all((response_data["is_valid"], not response_data["is_admin"])):
+                    return redirect("login")
+            else:
+                return redirect("login")
+        except Exception as e:
+            print(e)
+            messages.error(request, "Error communicating with API")
+            return redirect("login")
+
         return render(request, self.content)
-
-
-def login_view(request):
-    # print(get_token(request))
-    # if request.method == "POST":
-    #     username = request.POST["username"]
-    #     password = request.POST["password"]
-    #     response = requests.post(f"{API_URL}login/", json={"username": username, "password": password})
-    #     if response.status_code == 200:
-    #         return redirect("dashboard")
-    #     return render(request, "frontend/login.html", {"error": response.json().get("error", "Invalid credentials")})
-    # return render(request, "frontend/login.html")
-    if request.method == "POST":
-        csrf_token = get_token(request)  # Generate CSRF token
-        print(csrf_token)
-        username = request.POST["username"]
-        password = request.POST["password"]
-
-        # Send CSRF token in the headers for validation
-        headers = {"Content-Type": "application/json", "X-CSRFToken": csrf_token}
-        # headers = {"Content-Type": "application/json"}
-
-        response = requests.post(f"{API_URL}login/", json={"username": username, "password": password}, headers=headers)
-
-        if response.status_code == 200:
-            return redirect("dashboard")
-
-        print("jestem tu")
-        return render(request, "frontend/login.html", {"error": response.status_code})
-
-    return render(request, "frontend/login.html")
-
-
-@csrf_protect
-def dashboard_view(request):
-    print(get_token(request))
-    return render(request, "frontend/dashboard.html")
 
 
 def index(request):
