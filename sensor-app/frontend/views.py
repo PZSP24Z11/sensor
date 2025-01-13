@@ -156,7 +156,7 @@ class SensorsView(View):
             return redirect("login")
 
         sensors = get_all_sensors(session_id)
-        return render(request, self.content, {"sensors": sensors["sensor_list"]})
+        return render(request, self.content, {"sensors": sensors["sensors"]})
 
 
 class ChangeSensorNameView(View):
@@ -283,7 +283,24 @@ class UserView(View):
 
 
 class UserSensorsView(View):
-    pass
+    content = "frontend/user_sensors.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+
+        try:
+            response = requests.get(f"{API_URL}all_sensors/", cookies={"session_id": session_id})
+            data = response.json()
+
+            response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
+            username = response.json()["username"]
+            return render(request, self.content, {"username": username, "sensors": data["sensors"]})
+        except Exception as e:
+            print(e)
+            return redirect("login")
 
 
 class UserPermissionRequestsView(View):

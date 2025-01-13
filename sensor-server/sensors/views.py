@@ -401,7 +401,7 @@ class GetAllSensorsView(View):
             for sensor in sensors:
                 sensor["measurement_types"] = get_measurement_types(sensor["id"])
 
-            return JsonResponse(status=200, data={"sensor_list": sensors})
+            return JsonResponse(status=200, data={"sensors": sensors})
         except Session.DoesNotExist:
             return JsonResponse(status=401, data={"message": "Invalid session_id"})
         except Exception as e:

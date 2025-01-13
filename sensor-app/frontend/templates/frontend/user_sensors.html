@@ -1,0 +1,57 @@
+{% extends 'frontend/user.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Sensors</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Sensor Name</th>
+                <th>MAC Address</th>
+                <th>Measurement Types</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sensor in sensors %}
+            <tr id="sensor-{{ sensor.id }}">
+                <td>{{ sensor.nazwa_sensora }}</td>
+                <td>{{ sensor.adres_MAC }}</td>
+                <td>
+                    {% for typ in sensor.typy_pomiarow %}
+                        <span class="badge bg-secondary">{{ typ }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    <button onclick="requestPermission({{ sensor.id }})" class="btn btn-primary btn-sm">Request Permission</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function requestPermission(sensorId) {
+        const csrfToken = '{{ csrf_token }}';
+
+        fetch(`/user/sensors/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                sensor_id: sensorId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+</script>
+{% endblock %}
