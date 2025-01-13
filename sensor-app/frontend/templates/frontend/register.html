@@ -30,25 +30,21 @@
                 <form method="POST">
                   {% csrf_token %}
 
-                  <!-- Username -->
                   <div class="form-outline form-white mb-3">
                     <input type="text" name="username" class="form-control form-control-lg" required />
                     <label class="form-label">Login</label>
                   </div>
 
-                  <!-- Email -->
                   <div class="form-outline form-white mb-3">
                     <input type="email" name="email" class="form-control form-control-lg" required />
                     <label class="form-label">Email</label>
                   </div>
 
-                  <!-- Password -->
                   <div class="form-outline form-white mb-3">
                     <input type="password" name="password" class="form-control form-control-lg" required />
                     <label class="form-label">Password</label>
                   </div>
 
-                  <!-- Confirm Password -->
                   <div class="form-outline form-white mb-3">
                     <input type="password" name="confirmPassword" class="form-control form-control-lg" required />
                     <label class="form-label">Confirm Password</label>
@@ -74,7 +70,6 @@
 
 
 
-                  <!-- Register Button -->
                   <button class="btn btn-outline-light btn-lg px-5" type="submit">Register</button>
                 </form>
 

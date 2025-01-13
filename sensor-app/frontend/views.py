@@ -171,7 +171,7 @@ class UserMeasurementsView(View):
 
 
 class SensorsView(View):
-    content = "frontend/admin_sensors.html"
+    content = "frontend/sensors.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
         session_id = request.COOKIES.get("session_id")
@@ -191,7 +191,6 @@ class ChangeSensorNameView(View):
             return redirect("login")
         try:
             data = json.loads(request.body)
-            print(data)
             response = requests.post(f"{API_URL}change_sensor_name/", cookies={"session_id": session_id}, json=data)
             if response.status_code >= 400:
                 print(response.json()["message"])
@@ -209,7 +208,6 @@ class DeleteSensorView(View):
             return redirect("login")
         try:
             data = json.loads(request.body)
-            print(data)
             response = requests.post(f"{API_URL}delete_sensor/", cookies={"session_id": session_id}, json=data)
             if response.status_code >= 400:
                 print(response.json()["message"])
@@ -229,7 +227,6 @@ class SensorRequestsView(View):
             return redirect("login")
         try:
             response = requests.get(f"{API_URL}pending_sensor_requests/", cookies={"session_id": session_id})
-            print(response.json())
         except Exception as e:
             print(e)
             return redirect("login")
@@ -243,7 +240,6 @@ class SensorRequestsView(View):
             return redirect("login")
         try:
             data = json.loads(request.body)
-            print(data)
             response = requests.post(
                 f"{API_URL}change_sensor_request_status/", json=data, cookies={"session_id": session_id}
             )
@@ -256,7 +252,35 @@ class SensorRequestsView(View):
 
 
 class AdminPermissionRequestsView(View):
-    pass
+    content = "frontend/permission_requests.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+        try:
+            response = requests.get(f"{API_URL}pending_permission_requests/", cookies={"session_id": session_id})
+        except Exception as e:
+            print(e)
+            return redirect("login")
+
+        return render(request, self.content, {"requests": response.json()["p_requests"]})
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+        try:
+            data = json.loads(request.body)
+            response = requests.post(f"{API_URL}change_prequest/", json=data, cookies={"session_id": session_id})
+            print(response.json())
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal Server Error"})
+
+        return JsonResponse(status=response.status_code, data=response.json())
 
 
 class LogoutView(View):
@@ -268,7 +292,6 @@ class LogoutView(View):
         try:
             response = requests.get(f"{API_URL}logout/", cookies={"session_id": session_id})
             if response.status_code == 200:
-                print("logout successfull")
                 response = redirect("login")
                 response.delete_cookie("session_id")
                 return response
@@ -326,9 +349,44 @@ class UserSensorsView(View):
             print(e)
             return redirect("login")
 
+    def post(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+
+        try:
+            data = json.loads(request.body)
+            response = requests.post(
+                f"{API_URL}submit_permission_request/", json=data, cookies={"session_id": session_id}
+            )
+
+            return JsonResponse(status=response.status_code, data=response.json())
+
+        except Exception as e:
+            print(e)
+            return redirect("login")
+
 
 class UserPermissionRequestsView(View):
-    pass
+    content = "frontend/user_requests.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+
+        try:
+            response = requests.get(f"{API_URL}pending_permission_requests/", cookies={"session_id": session_id})
+            data = response.json()
+
+            response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
+            username = response.json()["username"]
+            return render(request, self.content, {"username": username, "requests": data["p_requests"]})
+        except Exception as e:
+            print(e)
+            return redirect("login")
 
 
 class LatestSensorMeasurementsView(View):
