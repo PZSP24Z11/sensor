@@ -14,7 +14,7 @@
         <tbody>
             {% for sensor in sensors %}
             <tr id="sensor-{{ sensor.id }}">
-                <td>{{ sensor.nazwa_sensora }}</td>
+                <td id="sensor-name-{{ sensor.id }}">{{ sensor.nazwa_sensora }}</td>
                 <td>{{ sensor.adres_MAC }}</td>
                 <td>
                     <button onclick="editSensor({{ sensor.id }}, '{{ sensor.nazwa_sensora }}')" class="btn btn-primary btn-sm">Edit</button>
@@ -62,19 +62,20 @@
         const sensorName = document.getElementById('sensorName').value;
         const csrfToken = '{{ csrf_token }}';
 
-        fetch(`/admin/sensors/${sensorId}/edit/`, {
+        fetch(`/admin/sensors/change_name/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
             },
             body: JSON.stringify({
-                nazwa_sensora: sensorName
+                sensor_id: sensorId,
+                name: sensorName,
             })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
+            if (data.message === 'Changed name') {
                 document.querySelector(`#sensor-${sensorId} td:first-child`).innerText = sensorName;
                 var editSensorModal = bootstrap.Modal.getInstance(document.getElementById('editSensorModal'));
                 editSensorModal.hide();
@@ -90,16 +91,19 @@
     function deleteSensor(sensorId) {
         const csrfToken = '{{ csrf_token }}';
 
-        fetch(`/admin/sensors/${sensorId}/delete/`, {
+        fetch(`/admin/sensors/delete/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
-            }
+            },
+            body: JSON.stringify({
+                sensor_id: sensorId,
+            })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
+            if (data.message === 'Sensor deleted') {
                 document.getElementById(`sensor-${sensorId}`).remove();
             } else {
                 alert('Failed to delete sensor');
@@ -110,4 +114,5 @@
         });
     }
 </script>
+<p>Note: Deleting a sensor will also delete all its associated measurements.</p>
 {% endblock %}

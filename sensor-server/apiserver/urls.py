@@ -33,6 +33,8 @@ from sensors.views import (
     PendingSensorRequestsView,
     ChangeSensorRequestStatusView,
     GetAllSensorsView,
+    ChangeSensorNameView,
+    DeleteSensorView,
 )
 
 urlpatterns = [
@@ -56,4 +58,6 @@ urlpatterns = [
         name="change-sensor-request-status",
     ),
     path("api/all_sensors/", GetAllSensorsView.as_view(), name="api-all-sensors"),
+    path("api/change_sensor_name/", ChangeSensorNameView.as_view(), name="api-change-sensor-name"),
+    path("api/delete_sensor/", DeleteSensorView.as_view(), name="api-delete-sensor"),
 ]

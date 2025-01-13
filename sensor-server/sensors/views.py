@@ -492,7 +492,7 @@ class DeleteSensorView(View):
             sensor = Sensor.objects.get(id=sensor_id)
             sensor.delete()
 
-            return JsonResponse(status=200, data={"message": "Sensor Correctly deleted"})
+            return JsonResponse(status=200, data={"message": "Sensor deleted"})
         except Sensor.DoesNotExist:
             return JsonResponse(stataus=400, data={"message": "Invalid sensor id"})
         except Session.DoesNotExist:
@@ -524,11 +524,11 @@ class ChangeSensorNameView(View):
             sensor = Sensor.objects.get(id=sensor_id)
             sensor.nazwa_sensora = sensor_name
             sensor.save()
-            return JsonResponse(status=200, data={"meassage": "Change name"})
+            return JsonResponse(status=200, data={"message": "Changed name"})
         except Sensor.DoesNotExist:
             return JsonResponse(stataus=400, data={"message": "Invalid sensor id"})
         except Session.DoesNotExist:
-            return JsonResponse(stataus=401, data={"message": "Unauthorizes session"})
+            return JsonResponse(stataus=401, data={"message": "Unauthorized session"})
         except json.JSONDecodeError as e:
             print(e)
             return JsonResponse(status=400, data={"message": "Expected JSON format"})

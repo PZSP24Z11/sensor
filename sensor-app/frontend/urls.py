@@ -28,6 +28,8 @@ from .views import (
     SensorRequestsView,
     PermissionRequestsView,
     LogoutView,
+    ChangeSensorNameView,
+    DeleteSensorView,
 )
 
 urlpatterns = [
@@ -41,5 +43,7 @@ urlpatterns = [
     path("admin/sensors/", SensorsView.as_view(), name="sensors"),
     path("admin/sensor_requests/", SensorRequestsView.as_view(), name="sensor-requests"),
     path("admin/permission_requests/", PermissionRequestsView.as_view(), name="permission-requests"),
+    path("admin/sensors/change_name/", ChangeSensorNameView.as_view(), name="change-sensor-name"),
+    path("admin/sensors/delete/", DeleteSensorView.as_view(), name="delete-sensor"),
     path("logout/", LogoutView.as_view(), name="logout"),
 ]
