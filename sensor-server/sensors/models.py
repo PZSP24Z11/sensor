@@ -80,3 +80,14 @@ class SensorRequest(models.Model):
 
     def __str__(self) -> str:
         return f"Request for {self.nazwa_sensora} ({self.adres_MAC}) - {self.status}"
+
+
+class SensorPermissionRequest(models.Model):
+    uzytkownik = models.ForeignKey(Uzytkownik, on_delete=models.CASCADE)
+    sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE)
+    status = models.CharField(
+        max_length=20,
+        choices=[("Pending", "Pending"), ("Approved", "Approved"), ("Rejected", "Rejected")],
+        default="Pending",
+    )
+    request_date = models.DateTimeField(auto_now_add=True)

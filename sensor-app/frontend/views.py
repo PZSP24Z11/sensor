@@ -215,12 +215,26 @@ class SensorRequestsView(View):
             return redirect("login")
 
 
-class PermissionRequestsView(View):
+class AdminPermissionRequestsView(View):
     pass
 
 
 class LogoutView(View):
-    pass
+    def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "Error: no user_id")
+            return redirect("login")
+        try:
+            response = requests.get(f"{API_URL}logout/", cookies={"session_id": session_id})
+            if response.status_code == 200:
+                print("logout successfull")
+                response = redirect("login")
+                response.delete_cookie("session_id")
+                return response
+        except Exception as e:
+            print(e)
+        return JsonResponse(status=500, data={"message": "Log out didnt succeed"})
 
 
 class DashboardView(View):
