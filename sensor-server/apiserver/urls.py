@@ -38,6 +38,7 @@ from sensors.views import (
     PendingPermissionRequestsView,
     SubmitPermissionRequestView,
     GetUsernameView,
+    ChangePermissionRequestStatusView,
 )
 
 urlpatterns = [
@@ -68,4 +69,5 @@ urlpatterns = [
         "api/pending_permission_requests/", PendingPermissionRequestsView.as_view(), name="pending-permission-requests"
     ),
     path("api/get_username/", GetUsernameView.as_view(), name="get-username"),
+    path("api/change_prequest/", ChangePermissionRequestStatusView.as_view(), name="change-prequest"),
 ]
