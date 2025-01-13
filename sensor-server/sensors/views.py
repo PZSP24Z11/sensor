@@ -18,6 +18,7 @@ from typing import Optional
 import json
 from django.shortcuts import render, redirect
 from django.middleware.csrf import get_token
+from django.core.paginator import Paginator
 import re
 import string
 import random
@@ -304,6 +305,32 @@ class LoginView(View):
         return JsonResponse(
             status=status, data={"message": message, "session_id": session_id, "is_admin": user.is_superuser}
         )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class GetMeasurementsView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        sensor_id = request.GET.get("sensor_id")
+        reading_type = request.GET.get("type")
+        page_number = request.GET.get("page")
+        
+        readings = Pomiar.objects.filter(sensor_id=sensor_id, typ_pomiaru=reading_type).order_by('-data_pomiaru')
+        paginator = Paginator(readings, 10)
+
+        result = paginator.get_page(page_number)
+        readings_data = [
+        {
+            'timestamp': reading.data_pomiaru.strftime('%Y-%m-%d %H:%M:%S'),
+            'value': reading.wartosc_pomiaru
+        }
+        for reading in result]
+    
+        return JsonResponse({
+            'results': readings_data,
+            'count': paginator.count,
+            'num_pages': paginator.num_pages,
+            'current_page': result.number
+        })
 
 
 @method_decorator(csrf_exempt, name="dispatch")
