@@ -168,7 +168,7 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
                         SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
                 return HttpResponse("1")
             except Sensor.DoesNotExist:
-                if not SensorRequest.objects.filter(adres_MAC=mac_address).exclude(status="Rejected").exists():
+                if not SensorRequest.objects.filter(adres_MAC=mac_address).exclude(status="Pending").exists():
                     random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
                     current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                     name = f"{random_chars}_{current_datetime}"
@@ -176,7 +176,8 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
                     SensorRequest.objects.create(nazwa_sensora=name, adres_MAC=mac_address)
                 return HttpResponse("2")
 
-        except Exception:
+        except Exception as e:
+            print(e)
             return HttpResponse("3")
 
     return HttpResponse("3")
@@ -313,24 +314,24 @@ class GetMeasurementsView(View):
         sensor_id = request.GET.get("sensor_id")
         reading_type = request.GET.get("type")
         page_number = request.GET.get("page")
-        
-        readings = Pomiar.objects.filter(sensor_id=sensor_id, typ_pomiaru=reading_type).order_by('-data_pomiaru')
+
+        readings = Pomiar.objects.filter(sensor_id=sensor_id, typ_pomiaru=reading_type).order_by("-data_pomiaru")
         paginator = Paginator(readings, 10)
 
         result = paginator.get_page(page_number)
         readings_data = [
-        {
-            'timestamp': reading.data_pomiaru.strftime('%Y-%m-%d %H:%M:%S'),
-            'value': reading.wartosc_pomiaru
-        }
-        for reading in result]
-    
-        return JsonResponse({
-            'results': readings_data,
-            'count': paginator.count,
-            'num_pages': paginator.num_pages,
-            'current_page': result.number
-        })
+            {"timestamp": reading.data_pomiaru.strftime("%Y-%m-%d %H:%M:%S"), "value": reading.wartosc_pomiaru}
+            for reading in result
+        ]
+
+        return JsonResponse(
+            {
+                "results": readings_data,
+                "count": paginator.count,
+                "num_pages": paginator.num_pages,
+                "current_page": result.number,
+            }
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")

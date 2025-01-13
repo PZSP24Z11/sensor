@@ -68,7 +68,7 @@
                 data.results.forEach(reading => {
                     const row = `<tr>
                                     <td>${reading.timestamp}</td>
-                                    <td>${reading.value}${currentUnit}</td>
+                                    <td>${reading.value / 100}${currentUnit}</td>
                                 </tr>`;
                     tableBody.innerHTML += row;
                 });
