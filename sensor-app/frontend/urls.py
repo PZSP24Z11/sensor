@@ -17,7 +17,18 @@ Including another URLconf
 
 from django.urls import path
 from . import views
-from .views import RegisterUserView, LoginView, AdminView, DashboardView, LatestSensorMeasurementeView
+from .views import (
+    RegisterUserView,
+    LoginView,
+    AdminView,
+    DashboardView,
+    LatestSensorMeasurementsView,
+    MeasurementsView,
+    SensorsView,
+    SensorRequestsView,
+    PermissionRequestsView,
+    LogoutView,
+)
 
 urlpatterns = [
     path("", views.index, name="index"),
@@ -25,5 +36,10 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("admin/", AdminView.as_view(), name="admin"),
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
-    path("latest_sensor_measurements/", LatestSensorMeasurementeView.as_view(), name="latest-sensor-measurements"),
+    path("latest_sensor_measurements/", LatestSensorMeasurementsView.as_view(), name="latest-sensor-measurements"),
+    path("admin/measurements/", MeasurementsView.as_view(), name="measurements"),
+    path("admin/sensors/", SensorsView.as_view(), name="sensors"),
+    path("admin/sensor_requests/", SensorRequestsView.as_view(), name="sensor-requests"),
+    path("admin/permission_requests/", PermissionRequestsView.as_view(), name="permission-requests"),
+    path("logout/", LogoutView.as_view(), name="logout"),
 ]

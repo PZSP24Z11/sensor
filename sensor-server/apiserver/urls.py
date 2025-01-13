@@ -30,6 +30,9 @@ from sensors.views import (
     ValidateSessionView,
     GetSensorsView,
     LatestSensorMeasurementsView,
+    PendingSensorRequestsView,
+    ChangeSensorRequestStatusView,
+    GetAllSensorsView,
 )
 
 urlpatterns = [
@@ -46,4 +49,11 @@ urlpatterns = [
     path("api/validate_session/", ValidateSessionView.as_view(), name="api-validate-session"),
     path("api/sensors/", GetSensorsView.as_view(), name="api-sensors"),
     path("api/latest_sensor_measurements/", LatestSensorMeasurementsView.as_view(), name="latest-sensor-measurements"),
+    path("api/pending_sensor_requests/", PendingSensorRequestsView.as_view(), name="pending-sensor-requests"),
+    path(
+        "api/change_sensor_request_status/",
+        ChangeSensorRequestStatusView.as_view(),
+        name="change-sensor-request-status",
+    ),
+    path("api/all_sensors/", GetAllSensorsView.as_view(), name="api-all-sensors"),
 ]

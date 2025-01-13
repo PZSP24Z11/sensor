@@ -1,0 +1,57 @@
+{% extends 'frontend/admin.html' %}
+{% block content %}
+<div class="container">
+    <h2>Pending Sensor Requests</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Sensor Name</th>
+                <th>MAC Address</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for request in sensor_requests %}
+            <tr id="sensor-request-{{ request.id }}">
+                <td>{{ request.nazwa_sensora }}</td>
+                <td>{{ request.adres_MAC }}</td>
+                <td>{{ request.status }}</td>
+                <td>
+                    <button onclick="updateRequestStatus({{ request.id }}, 'Approved')" class="btn btn-success btn-sm">Accept</button>
+                    <button onclick="updateRequestStatus({{ request.id }}, 'Rejected')" class="btn btn-danger btn-sm">Reject</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<script>
+    function updateRequestStatus(requestId, status) {
+        const csrfToken = '{{ csrf_token }}';
+        fetch('/admin/sensor_requests/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                sensor_request_id: requestId,
+                status: status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message === 'Status changed successfully') {
+                const row = document.getElementById(`sensor-request-${requestId}`);
+                row.remove();
+            } else {
+                alert('Failed to update request status');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+</script>
+{% endblock %}

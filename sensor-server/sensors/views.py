@@ -18,7 +18,7 @@ from apiserver.anomaly_notifier import send_anomaly_mail
 from django.views import View
 
 
-type_map = {"T": "Temperature", "H": "Humidity"}
+type_map = {"T": ("Temperature", "u00B0C"), "H": ("Humidity", "%")}
 
 
 def get_user_from_session(session_key: str) -> Uzytkownik:
@@ -43,7 +43,6 @@ def get_measurement_types(sensor_id: int) -> Optional[list[str]]:
 
 
 def get_latest_measurements(sensor_id: int, max: int = 7):
-
     sensor = Sensor.objects.get(id=sensor_id)
     measurement_types = TypPomiaru.objects.filter(
         id__in=SensorTypPomiaru.objects.filter(sensor=sensor).values_list("typ_pomiaru_id", flat=True)
@@ -150,9 +149,12 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
             try:
                 sensor = Sensor.objects.get(adres_MAC=mac_address)
                 for measurement in measurement_types:
-                    full_name = type_map.get(measurement.upper())
+                    m_type = type_map.get(measurement.upper())
+                    full_name = m_type[0]
                     if full_name:
-                        measurement_type, _ = TypPomiaru.objects.get_or_create(nazwa_pomiaru=full_name)
+                        measurement_type, _ = TypPomiaru.objects.get_or_create(
+                            nazwa_pomiaru=full_name, jednostka=m_type
+                        )
                         SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
                 return HttpResponse("1")
             except Sensor.DoesNotExist:
@@ -344,9 +346,8 @@ class ValidateSessionView(View):
 class GetSensorsView(View):
     def get(self, request: HttpRequest) -> JsonResponse:
         session_id = request.COOKIES.get("session_id")
-
         if not session_id:
-            return JsonResponse(status=400, data={"message": "Bad request: session_id needed"})
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
         try:
             user = get_user_from_session(session_id)
             if user.is_superuser:
@@ -368,12 +369,32 @@ class GetSensorsView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
+class GetAllSensorsView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+        try:
+            get_user_from_session(session_id)  # if no exception - user exists
+            sensors = list(Sensor.objects.all().values())
+            for sensor in sensors:
+                sensor["measurement_types"] = get_measurement_types(sensor["id"])
+
+            return JsonResponse(status=200, data={"sensor_list": sensors})
+        except Session.DoesNotExist:
+            return JsonResponse(status=401, data={"message": "Invalid session_id"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
 class LatestSensorMeasurementsView(View):
     def post(self, request: HttpRequest) -> JsonResponse:
         session_id = request.COOKIES.get("session_id")
 
         if not session_id:
-            return JsonResponse(status=400, data={"message": "Bad request: session_id needed"})
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
         try:
             user = get_user_from_session(session_id)
 
@@ -393,8 +414,127 @@ class LatestSensorMeasurementsView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class ChangeRequestStatus(View):
-    pass
+class ChangeSensorRequestStatusView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+
+        try:
+            user = get_user_from_session(session_id)
+            if not user.is_superuser:
+                return JsonResponse(status=401, data={"message": "User doesnt have privileges to perform operation"})
+
+            data = json.loads(request.body)
+            sesnor_request_id = data["sensor_request_id"]
+            set_status = data["status"]
+
+            if set_status not in ("Rejected", "Approved"):
+                return JsonResponse(
+                    status=400,
+                    data={
+                        "meassage": "Bad request: status can only be changed to one of the following: Rejected, Accepted"
+                    },
+                )
+
+            sreq = SensorRequest.objects.get(id=sesnor_request_id)
+            sreq.status = set_status
+            if sreq.status == "Approved":
+                Sensor.objects.create(nazwa_sensora=sreq.nazwa_sensora, adres_MAC=sreq.adres_MAC)
+
+            sreq.save()
+
+            return JsonResponse(status=200, data={"message": "Status changed successfully"})
+        except SensorRequest.DoesNotExist:
+            return JsonResponse(status=400, data={"message": "Sensor Request doesnt exist"})
+        except Session.DoesNotExist:
+            return JsonResponse(stataus=401, data={"message": "Unauthorizes session"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class PendingSensorRequestsView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+        try:
+            user = get_user_from_session(session_id)
+            if not user.is_superuser:
+                return JsonResponse(status=401, data={"message": "User doesnt have privileges to perform operation"})
+
+            sesnor_requests = list(SensorRequest.objects.filter(status="Pending").values())
+            return JsonResponse(status=200, data={"sensor_requests": sesnor_requests})
+        except Session.DoesNotExist:
+            return JsonResponse(stataus=401, data={"message": "Unauthorizes session"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class DeleteSensorView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+        try:
+            user = get_user_from_session(session_id)
+            if not user.is_superuser:
+                return JsonResponse(status=401, data={"message": "User doesnt have privileges to perform operation"})
+            data = json.loads(request.body)
+            sensor_id = data["sensor_id"]
+            if not sensor_id:
+                return JsonResponse(status=400, data={"message": "Bad format: sensor id required"})
+
+            sensor = Sensor.objects.get(id=sensor_id)
+            sensor.delete()
+
+            return JsonResponse(status=200, data={"message": "Sensor Correctly deleted"})
+        except Sensor.DoesNotExist:
+            return JsonResponse(stataus=400, data={"message": "Invalid sensor id"})
+        except Session.DoesNotExist:
+            return JsonResponse(stataus=401, data={"message": "Unauthorizes session"})
+        except json.JSONDecodeError as e:
+            print(e)
+            return JsonResponse(status=400, data={"message": "Expected JSON format"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ChangeSensorNameView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+        try:
+            user = get_user_from_session(session_id)
+            if not user.is_superuser:
+                return JsonResponse(status=401, data={"message": "User doesnt have privileges to perform operation"})
+            data = json.loads(request.body)
+            sensor_id = data["sensor_id"]
+            sensor_name = data["name"]
+            if not all([sensor_id, sensor_name]):
+                return JsonResponse(status=400, data={"message": "Bad format sensor id and non empty required"})
+
+            sensor = Sensor.objects.get(id=sensor_id)
+            sensor.nazwa_sensora = sensor_name
+            sensor.save()
+            return JsonResponse(status=200, data={"meassage": "Change name"})
+        except Sensor.DoesNotExist:
+            return JsonResponse(stataus=400, data={"message": "Invalid sensor id"})
+        except Session.DoesNotExist:
+            return JsonResponse(stataus=401, data={"message": "Unauthorizes session"})
+        except json.JSONDecodeError as e:
+            print(e)
+            return JsonResponse(status=400, data={"message": "Expected JSON format"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
 
 
 def index_view(request: HttpRequest) -> HttpResponse:

@@ -1,0 +1,113 @@
+{% extends 'frontend/admin.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Sensors</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Sensor Name</th>
+                <th>MAC Address</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sensor in sensors %}
+            <tr id="sensor-{{ sensor.id }}">
+                <td>{{ sensor.nazwa_sensora }}</td>
+                <td>{{ sensor.adres_MAC }}</td>
+                <td>
+                    <button onclick="editSensor({{ sensor.id }}, '{{ sensor.nazwa_sensora }}')" class="btn btn-primary btn-sm">Edit</button>
+                    <button onclick="deleteSensor({{ sensor.id }})" class="btn btn-danger btn-sm">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal for editing sensor name -->
+<div class="modal fade" id="editSensorModal" tabindex="-1" aria-labelledby="editSensorModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editSensorModalLabel">Edit Sensor Name</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editSensorForm">
+                    <div class="mb-3">
+                        <label for="sensorName" class="form-label">Sensor Name</label>
+                        <input type="text" class="form-control" id="sensorName" required>
+                    </div>
+                    <input type="hidden" id="sensorId">
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function editSensor(sensorId, sensorName) {
+        document.getElementById('sensorId').value = sensorId;
+        document.getElementById('sensorName').value = sensorName;
+        var editSensorModal = new bootstrap.Modal(document.getElementById('editSensorModal'));
+        editSensorModal.show();
+    }
+
+    document.getElementById('editSensorForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const sensorId = document.getElementById('sensorId').value;
+        const sensorName = document.getElementById('sensorName').value;
+        const csrfToken = '{{ csrf_token }}';
+
+        fetch(`/admin/sensors/${sensorId}/edit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                nazwa_sensora: sensorName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.querySelector(`#sensor-${sensorId} td:first-child`).innerText = sensorName;
+                var editSensorModal = bootstrap.Modal.getInstance(document.getElementById('editSensorModal'));
+                editSensorModal.hide();
+            } else {
+                alert('Failed to update sensor name');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    });
+
+    function deleteSensor(sensorId) {
+        const csrfToken = '{{ csrf_token }}';
+
+        fetch(`/admin/sensors/${sensorId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById(`sensor-${sensorId}`).remove();
+            } else {
+                alert('Failed to delete sensor');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+</script>
+{% endblock %}
