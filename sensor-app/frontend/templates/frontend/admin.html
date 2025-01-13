@@ -13,20 +13,22 @@
 
 <body class="gradient-custom">
     <div class="container py-5">
-        <h2 class="text-center mb-4">Sensor Admin View Dashboard</h2>
-
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-center mb-0">Sensor Admin View Dashboard</h2>
+            <button class="btn btn-outline-dark mx-1">Logout</a>
+        </div>
         <div class="d-flex justify-content-center mb-3">
-            <button class="btn btn-outline-dark mx-1">Temperature</button>
-            <button class="btn btn-outline-dark mx-1">Humidity</button>
-            <button class="btn btn-outline-dark mx-1">Week</button>
-            <button class="btn btn-outline-dark mx-1">Day</button>
-            <button class="btn btn-outline-dark mx-1">Hour</button>
+            <button class="btn btn-outline-dark mx-1">Measurements</button>
+            <button class="btn btn-outline-dark mx-1">Users</button>
+            <button class="btn btn-outline-dark mx-1">Sensor Requests</button>
+            <button class="btn btn-outline-dark mx-1">Permission Requests</button>
+            <button class="btn btn-outline-dark mx-1">Sensors</button>
         </div>
 
         <div class="row">
             <div class="col-md-8">
                 <div class="card p-3">
-                    <h5>Temperature</h5>
+                    <h5>Measurements</h5>
                     <canvas id="sensorChart"></canvas>
                 </div>
             </div>
@@ -105,22 +107,40 @@
             if (selectedSensorCard) {
                 selectedSensorCard.click();
             }
-        }, 10000); // 10 sekund
+        }, 60000); // 60 sekund
 
 
         function updateChart(measurements) {
-            console.log("jestem w updateChart")
             console.log(measurements)
             const labels = []
             const datasets = []
+            const colors = [
+                'rgba(255, 99, 132, 0.2)',
+                'rgba(54, 162, 235, 0.2)',
+                'rgba(255, 206, 86, 0.2)',
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(153, 102, 255, 0.2)',
+                'rgba(255, 159, 64, 0.2)'
+            ];
+            const borderColors = [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+            ];
+
+                let colorIndex = 0;
 
             for (const [type, values] of Object.entries(measurements)) {
                 console.log("w forze")
                 console.log(type)
-                const data = values.map(measurement => measurement.wartosc_pomiaru / 100);
-                const label = type;
-                const borderColor = 'black';
-                const backgroundColor = 'rgba(0, 0, 0, 0.1)';
+                console.log(values.pomiary)
+                const data = values.pomiary.map(measurement => measurement.wartosc_pomiaru / 100);
+                const label = `${type} (${values.jednostka})`;
+                const borderColor = borderColors[colorIndex % borderColors.length];
+                const backgroundColor = colors[colorIndex % colors.length];
                 
                 datasets.push({
                     label: label,
@@ -130,10 +150,11 @@
                     borderWidth: 2
                 });
                 if (labels.length === 0) {
-                    values.forEach(measurement => {
+                    values.pomiary.forEach(measurement => {
                         labels.push(new Date(measurement.data_pomiaru).toLocaleTimeString());
                     });
                 }
+                colorIndex++;
             }
 
             sensorChart.data.labels = labels;

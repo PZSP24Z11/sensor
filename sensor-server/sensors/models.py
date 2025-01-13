@@ -48,6 +48,7 @@ class Sensor(models.Model):
 
 class TypPomiaru(models.Model):
     nazwa_pomiaru = models.CharField(max_length=100)
+    jednostka = models.CharField(max_length=50)
 
 
 class UzytkownikSensor(models.Model):
@@ -67,7 +68,7 @@ class Pomiar(models.Model):
     data_pomiaru = models.DateTimeField()
 
 
-class Request(models.Model):
+class SensorRequest(models.Model):
     nazwa_sensora = models.CharField(max_length=255)
     adres_MAC = models.CharField(max_length=100, unique=True)
     status = models.CharField(

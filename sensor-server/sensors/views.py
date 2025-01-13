@@ -1,6 +1,6 @@
 from django.http import JsonResponse, HttpResponse, HttpRequest
 from django.utils.decorators import method_decorator
-from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik, UzytkownikManager, UzytkownikSensor
+from sensors.models import Pomiar, Sensor, TypPomiaru, SensorTypPomiaru, Uzytkownik, UzytkownikSensor, SensorRequest
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.sessions.models import Session
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
@@ -54,7 +54,10 @@ def get_latest_measurements(sensor_id: int, max: int = 7):
         measurements = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type).order_by("-data_pomiaru")[
             :max
         ]
-        latest_measurements[measurement_type.nazwa_pomiaru] = list(measurements.values())[::-1]
+        latest_measurements[measurement_type.nazwa_pomiaru] = {
+            "jednostka": measurement_type.jednostka,
+            "pomiary": list(measurements.values())[::-1],
+        }
     return latest_measurements
 
 
@@ -153,16 +156,12 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
                         SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
                 return HttpResponse("1")
             except Sensor.DoesNotExist:
-                random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
-                current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                name = f"{random_chars}_{current_datetime}"
+                if not SensorRequest.objects.filter(adres_MAC=mac_address).exclude(status="Rejected").exists():
+                    random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
+                    current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    name = f"{random_chars}_{current_datetime}"
 
-                sensor = Sensor.objects.create(nazwa_sensora=name, adres_MAC=mac_address)
-                for measurement in measurement_types:
-                    full_name = type_map.get(measurement.upper())
-                    if full_name:
-                        measurement_type, _ = TypPomiaru.objects.get_or_create(nazwa_pomiaru=full_name)
-                        SensorTypPomiaru.objects.create(sensor=sensor, typ_pomiaru=measurement_type)
+                    SensorRequest.objects.create(nazwa_sensora=name, adres_MAC=mac_address)
                 return HttpResponse("2")
 
         except Exception:
@@ -229,6 +228,7 @@ def latest_measurements_view(request: HttpRequest, sensor_id: int) -> JsonRespon
         data = [
             {
                 "typ_pomiaru": measurement.typ_pomiaru.nazwa_pomiaru,
+                "jednostka": measurement.typ_pomiaru.jednostka,
                 "wartosc": measurement.wartosc_pomiaru,
                 "data": measurement.data_pomiaru.strftime("%Y-%m-%d %H:%M:%S"),
             }
@@ -325,7 +325,6 @@ class ValidateSessionView(View):
     def get(self, request: HttpRequest) -> JsonResponse:
         status, is_valid, is_admin = 200, True, False
         session_id = request.COOKIES.get("session_id")
-        print(session_id)
         try:
             if session_id:
                 user = get_user_from_session(session_id)
@@ -391,6 +390,11 @@ class LatestSensorMeasurementsView(View):
         except Exception as e:
             print(e)
             return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ChangeRequestStatus(View):
+    pass
 
 
 def index_view(request: HttpRequest) -> HttpResponse:
