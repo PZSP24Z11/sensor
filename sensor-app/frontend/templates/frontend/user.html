@@ -24,6 +24,9 @@
                         <a class="nav-link {% if request.path == '/user/measurements/' %}active{% endif %}" href="{% url 'user-measurements' %}">Measurements</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/user/archive/' %}active{% endif %}" href="{% url 'user-archive' %}">Archive</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.path == '/user/sensors/' %}active{% endif %}" href="{% url 'user-sensors' %}">Sensors</a>
                     </li>
                     <li class="nav-item">

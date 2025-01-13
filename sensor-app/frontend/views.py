@@ -60,6 +60,30 @@ class RegisterUserView(View):
     def get(self, request: HttpRequest) -> HttpResponse:
         return render(request, "frontend/register.html")
 
+class ArchiveView(View):
+    def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+
+        sensors = get_sensor_list(session_id)
+        print(sensors)
+        return render(request, 'frontend/archive.html', {"sensors": sensors["sensor_list"]})
+
+class GetMeasurementsView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return JsonResponse(status=500, data={"error": "you must log in to access this resource"})
+        try:
+            params = request.GET.dict()
+            response = requests.get(f"{API_URL}get_measurements/", cookies={"session_id": session_id}, params=params)
+        except Exception as e:
+            print(e)
+
+        return JsonResponse(status=200, data=response.json())
 
 class LoginView(View):
     content = "frontend/login.html"

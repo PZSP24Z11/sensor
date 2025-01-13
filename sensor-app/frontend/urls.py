@@ -33,6 +33,8 @@ from .views import (
     UserSensorsView,
     UserPermissionRequestsView,
     UserMeasurementsView,
+    ArchiveView,
+    GetMeasurementsView
 )
 
 urlpatterns = [
@@ -44,6 +46,8 @@ urlpatterns = [
     path("user/measurements/", UserMeasurementsView.as_view(), name="user-measurements"),
     path("user/sensors/", UserSensorsView.as_view(), name="user-sensors"),
     path("user/permission_requests", UserPermissionRequestsView.as_view(), name="user-permission-requests"),
+    path("user/archive/", ArchiveView.as_view(), name="user-archive"),
+    path("user/archive/measurements/", GetMeasurementsView.as_view(), name="archive-measurements"),
     path("latest_sensor_measurements/", LatestSensorMeasurementsView.as_view(), name="latest-sensor-measurements"),
     path("admin/measurements/", MeasurementsView.as_view(), name="measurements"),
     path("admin/sensors/", SensorsView.as_view(), name="sensors"),
