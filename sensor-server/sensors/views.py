@@ -573,18 +573,19 @@ class PendingPermissionRequestsView(View):
 
             response_data = []
             for prequest in permission_requests:
-                sensor = Sensor.objects.get(id=prequest.sensor)
-                user = Uzytkownik.objects.get(id=prequest.uzytkownik)
+                sensor = Sensor.objects.get(id=prequest.sensor.id)
+                user = Uzytkownik.objects.get(id=prequest.uzytkownik.id)
                 response_data.append(
                     {
                         "username": user.username,
                         "email": user.email,
                         "sensor_name": sensor.nazwa_sensora,
                         "sensor_MAC": sensor.adres_MAC,
+                        "status": prequest.status,
                     }
                 )
 
-            return JsonResponse(status=200, data={"p_requests": permission_requests})
+            return JsonResponse(status=200, data={"p_requests": response_data})
         except Session.DoesNotExist:
             return JsonResponse(status=401, data={"message": "Unauthorized session"})
         except Exception as e:

@@ -1,0 +1,25 @@
+{% extends 'frontend/user.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Permission Requests</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Sensor Name</th>
+                <th>MAC Address</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for request in requests %}
+            <tr>
+                <td>{{ request.sensor_name }}</td>
+                <td>{{ request.sensor_MAC }}</td>
+                <td>{{ request.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
