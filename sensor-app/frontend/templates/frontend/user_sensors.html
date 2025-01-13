@@ -18,8 +18,8 @@
                 <td>{{ sensor.nazwa_sensora }}</td>
                 <td>{{ sensor.adres_MAC }}</td>
                 <td>
-                    {% for typ in sensor.typy_pomiarow %}
-                        <span class="badge bg-secondary">{{ typ }}</span>
+                    {% for measurement_type in sensor.measurement_types %}
+                        <span class="badge bg-secondary">{{ measurement_type.nazwa_pomiaru }}</span>
                     {% endfor %}
                 </td>
                 <td>

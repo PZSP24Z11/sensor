@@ -1,6 +1,15 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Uzytkownik, Sensor, TypPomiaru, UzytkownikSensor, SensorTypPomiaru, Pomiar, SensorRequest
+from .models import (
+    Uzytkownik,
+    Sensor,
+    TypPomiaru,
+    UzytkownikSensor,
+    SensorTypPomiaru,
+    Pomiar,
+    SensorRequest,
+    SensorPermissionRequest,
+)
 
 
 class CustomUserAdmin(UserAdmin):
@@ -41,3 +50,4 @@ admin.site.register(UzytkownikSensor)
 admin.site.register(SensorTypPomiaru)
 admin.site.register(Pomiar)
 admin.site.register(SensorRequest)
+admin.site.register(SensorPermissionRequest)

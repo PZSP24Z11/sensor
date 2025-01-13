@@ -600,18 +600,20 @@ class PendingPermissionRequestsView(View):
 
             response_data = []
             for prequest in permission_requests:
-                sensor = Sensor.objects.get(id=prequest.sensor)
-                user = Uzytkownik.objects.get(id=prequest.uzytkownik)
+                sensor = Sensor.objects.get(id=prequest.sensor.id)
+                user = Uzytkownik.objects.get(id=prequest.uzytkownik.id)
                 response_data.append(
                     {
+                        "id": prequest.id,
                         "username": user.username,
                         "email": user.email,
                         "sensor_name": sensor.nazwa_sensora,
                         "sensor_MAC": sensor.adres_MAC,
+                        "status": prequest.status,
                     }
                 )
 
-            return JsonResponse(status=200, data={"p_requests": permission_requests})
+            return JsonResponse(status=200, data={"p_requests": response_data})
         except Session.DoesNotExist:
             return JsonResponse(status=401, data={"message": "Unauthorized session"})
         except Exception as e:
@@ -632,6 +634,8 @@ class SubmitPermissionRequestView(View):
             sensor_id = data["sensor_id"]
 
             sensor = Sensor.objects.get(id=sensor_id)
+            if SensorPermissionRequest.objects.filter(uzytkownik=user, sensor=sensor, status="Pending").exists():
+                return JsonResponse(status=400, data={"message": "Pending request already exists for this sensor"})
             SensorPermissionRequest.objects.create(uzytkownik=user, sensor=sensor, status="Pending")
 
             return JsonResponse(status=201, data={"message": "Request Created"})
@@ -642,6 +646,45 @@ class SubmitPermissionRequestView(View):
         except Exception as e:
             print(e)
             return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class ChangePermissionRequestStatusView(View):
+    def post(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+        try:
+            user = get_user_from_session(session_id)
+            if not user.is_superuser:
+                return JsonResponse(
+                    status=401, data={"message": "You need to be administrator to perform this operation"}
+                )
+            data = json.loads(request.body)
+            p_request_id = data["request_id"]
+            status = data["status"]
+
+            if not p_request_id or not status or status not in ("Approved", "Rejected"):
+                return JsonResponse(status=400, data={"message": "Both request id and status fields are required"})
+
+            permission_request = SensorPermissionRequest.objects.get(id=p_request_id)
+            user = Uzytkownik.objects.get(id=permission_request.uzytkownik.id)
+
+            if status == "Approved":
+                print("in approved")
+                UzytkownikSensor.objects.create(
+                    uzytkownik=permission_request.uzytkownik, sensor=permission_request.sensor
+                )
+
+            permission_request.status = status
+            permission_request.save()
+
+            return JsonResponse(status=200, data={"message": "Request updated successfully"})
+        except json.JSONDecodeError as e:
+            print(e)
+            return JsonResponse(status=400, data={"message": "Expected json value"})
+        except Session.DoesNotExist:
+            return JsonResponse()
 
 
 def index_view(request: HttpRequest) -> HttpResponse:

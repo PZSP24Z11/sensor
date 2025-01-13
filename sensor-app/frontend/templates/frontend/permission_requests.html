@@ -1,0 +1,60 @@
+{% extends 'frontend/admin.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Permission Requests</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Sensor MAC Address</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for request in requests %}
+            <tr id="request-{{ request.id }}">
+                <td>{{ request.username }}</td>
+                <td>{{ request.email }}</td>
+                <td>{{ request.sensor_MAC }}</td>
+                <td>
+                    <button onclick="updateRequest( '{{ request.id }}', 'Approved' )" class="btn btn-success btn-sm">Accept</button>
+                    <button onclick="updateRequest( '{{ request.id }}', 'Rejected' )" class="btn btn-danger btn-sm">Reject</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function updateRequest(requestId, status) {
+        const csrfToken = '{{ csrf_token }}';
+
+        fetch(`/admin/permission_requests/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                request_id: requestId,
+                status: status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.message === "Request updated successfully") {
+                document.getElementById(`request-${requestId}`).remove();
+            } else {
+                alert('Failed to update request status');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+</script>
+{% endblock %}
