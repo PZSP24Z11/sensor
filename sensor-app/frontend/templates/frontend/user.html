@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin View Dashboard</title>
+    <title>User Page</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
@@ -14,23 +14,20 @@
 <body class="gradient-custom">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">Admin Dashboard</a>
+            <a class="navbar-brand" href="#">Logged as: {{ username }}</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/admin/measurements/' %}active{% endif %}" href="{% url 'measurements' %}">Measurements</a>
+                        <a class="nav-link {% if request.path == '/user/measurements/' %}active{% endif %}" href="{% url 'user-measurements' %}">Measurements</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/admin/sensors/' %}active{% endif %}" href="{% url 'sensors' %}">Sensors</a>
+                        <a class="nav-link {% if request.path == '/user/sensors/' %}active{% endif %}" href="{% url 'user-sensors' %}">Sensors</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/admin/sensor_requests/' %}active{% endif %}" href="{% url 'sensor-requests' %}">Sensor Requests</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/admin/permission_requests/' %}active{% endif %}" href="{% url 'permission-requests' %}">Permission Requests</a>
+                        <a class="nav-link {% if request.path == '/user/permission_requests/' %}active{% endif %}" href="{% url 'user-permission-requests' %}">Permission Requests</a>
                     </li>
                 </ul>
                 <ul class="navbar-nav ms-auto">

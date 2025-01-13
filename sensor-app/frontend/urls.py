@@ -21,7 +21,7 @@ from .views import (
     RegisterUserView,
     LoginView,
     AdminView,
-    DashboardView,
+    UserView,
     LatestSensorMeasurementsView,
     MeasurementsView,
     SensorsView,
@@ -30,6 +30,9 @@ from .views import (
     LogoutView,
     ChangeSensorNameView,
     DeleteSensorView,
+    UserSensorsView,
+    UserPermissionRequestsView,
+    UserMeasurementsView,
 )
 
 urlpatterns = [
@@ -37,7 +40,10 @@ urlpatterns = [
     path("register/", RegisterUserView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),
     path("admin/", AdminView.as_view(), name="admin"),
-    path("dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("user/", UserView.as_view(), name="user"),
+    path("user/measurements/", UserMeasurementsView.as_view(), name="user-measurements"),
+    path("user/sensors", UserSensorsView.as_view(), name="user-sensors"),
+    path("user/permission_requests", UserPermissionRequestsView.as_view(), name="user-permission-requests"),
     path("latest_sensor_measurements/", LatestSensorMeasurementsView.as_view(), name="latest-sensor-measurements"),
     path("admin/measurements/", MeasurementsView.as_view(), name="measurements"),
     path("admin/sensors/", SensorsView.as_view(), name="sensors"),

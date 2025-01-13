@@ -74,7 +74,7 @@ class LoginView(View):
                 response_data = response.json()
                 session_id = response_data["session_id"]
                 is_admin = response_data["is_admin"]
-                next_page = "admin" if is_admin else "dashboard"
+                next_page = "admin" if is_admin else "user"
                 if session_id:
                     response = redirect(next_page)
                     # for development
@@ -128,6 +128,22 @@ class MeasurementsView(View):
 
         sensors = get_sensor_list(session_id)
         return render(request, self.content, {"sensors": sensors["sensor_list"]})
+
+
+class UserMeasurementsView(View):
+    content = "frontend/user_measurements.html"
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            messages.error(request, "User must login to access this resource")
+            return redirect("login")
+
+        response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
+        username = response.json()["username"]
+
+        sensors = get_sensor_list(session_id)
+        return render(request, self.content, {"username": username, "sensors": sensors["sensor_list"]})
 
 
 class SensorsView(View):
@@ -237,8 +253,8 @@ class LogoutView(View):
         return JsonResponse(status=500, data={"message": "Log out didnt succeed"})
 
 
-class DashboardView(View):
-    content = "frontend/dashboard.html"
+class UserView(View):
+    content = "frontend/user.html"
 
     def get(self, request: HttpRequest) -> HttpResponse:
         session_id = request.COOKIES.get("session_id")
@@ -255,12 +271,23 @@ class DashboardView(View):
                     return redirect("login")
             else:
                 return redirect("login")
+
+            response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
+            username = response.json()["username"]
         except Exception as e:
             print(e)
             messages.error(request, "Error communicating with API")
             return redirect("login")
 
-        return render(request, self.content)
+        return render(request, self.content, {"username": username})
+
+
+class UserSensorsView(View):
+    pass
+
+
+class UserPermissionRequestsView(View):
+    pass
 
 
 class LatestSensorMeasurementsView(View):

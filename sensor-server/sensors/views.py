@@ -307,6 +307,23 @@ class LoginView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
+class GetUsernameView(View):
+    def get(self, request: HttpRequest) -> JsonResponse:
+        session_id = request.COOKIES.get("session_id")
+        if not session_id:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - no session_id"})
+        try:
+            user = get_user_from_session(session_id)
+            print(f"{user.username} {user.email}")
+            return JsonResponse(status=200, data={"username": user.username})
+        except Uzytkownik.DoesNotExist:
+            return JsonResponse(status=401, data={"message": "Unauthorized user - invalid session token"})
+        except Exception as e:
+            print(e)
+            return JsonResponse(status=500, data={"message": "Internal server error"})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
 class LogoutView(View):
     def get(self, request: HttpRequest) -> JsonResponse:
         session_id = request.COOKIES.get("session_id")

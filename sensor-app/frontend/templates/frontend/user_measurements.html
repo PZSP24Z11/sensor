@@ -1,0 +1,146 @@
+{% extends 'frontend/user.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card p-3">
+            <h5>Measurements</h5>
+            <canvas id="sensorChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <div class="bg-dark text-white rounded p-3">
+                <h5>Accessible Sensors</h5>
+            </div>
+            <div id="sensorList">
+                {% for sensor in sensors %}
+                <button class="sensor-card w-100"
+                    data-id="{{ sensor.id }}"
+                    data-nazwa="{{ sensor.nazwa_sensora }}"
+                    data-mac="{{ sensor.adres_MAC }}">
+                    <strong>{{ sensor.nazwa_sensora }}</strong><br>
+                    <small>{{ sensor.adres_MAC }}</small><br>
+                    <small>id: {{sensor.id}}</small><br>
+                    <small>Measures:</small>
+                    {% for measurement_type in sensor.measurement_types %}
+                        <small>{{ measurement_type.nazwa_pomiaru }}{% if not forloop.last %}, {% endif %}</small>
+                    {% endfor %}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sensorCards = document.querySelectorAll('.sensor-card');
+        let selectedSensorCard = null;
+
+        sensorCards.forEach(card => {
+            card.addEventListener('click', function() {
+                sensorCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedSensorCard = card;
+
+                const sensorId = card.getAttribute('data-id');
+                fetch('/latest_sensor_measurements/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ id: sensorId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    updateChart(data.measurements);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            });
+        });
+
+        if (sensorCards.length > 0) {
+            sensorCards[0].click();
+        }
+
+        setInterval(() => {
+            if (selectedSensorCard) {
+                selectedSensorCard.click();
+            }
+        }, 10000);
+
+        function updateChart(measurements) {
+            const labels = [];
+            const datasets = [];
+            const colors = [
+                'rgba(255, 99, 132, 0.2)',
+                'rgba(54, 162, 235, 0.2)',
+                'rgba(255, 206, 86, 0.2)',
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(153, 102, 255, 0.2)',
+                'rgba(255, 159, 64, 0.2)'
+            ];
+            const borderColors = [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+            ];
+
+            let colorIndex = 0;
+
+            for (const [type, values] of Object.entries(measurements)) {
+                const data = values.pomiary.map(measurement => measurement.wartosc_pomiaru);
+                const label = `${type} (${values.jednostka})`;
+                const borderColor = borderColors[colorIndex % borderColors.length];
+                const backgroundColor = colors[colorIndex % colors.length];
+
+                datasets.push({
+                    label: label,
+                    data: data,
+                    borderColor: borderColor,
+                    backgroundColor: backgroundColor,
+                    borderWidth: 2
+                });
+
+                if (labels.length === 0) {
+                    values.pomiary.forEach(measurement => {
+                        labels.push(new Date(measurement.data_pomiaru).toLocaleTimeString());
+                    });
+                }
+
+                colorIndex++;
+            }
+
+            sensorChart.data.labels = labels;
+            sensorChart.data.datasets = datasets;
+            sensorChart.update();
+        }
+    });
+
+    var ctx = document.getElementById('sensorChart').getContext('2d');
+    var sensorChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: []
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    suggestedMin: 5,
+                    suggestedMax: 35
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
