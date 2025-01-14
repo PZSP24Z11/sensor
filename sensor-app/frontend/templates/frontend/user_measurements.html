@@ -21,7 +21,6 @@
                     data-mac="{{ sensor.adres_MAC }}">
                     <strong>{{ sensor.nazwa_sensora }}</strong><br>
                     <small>{{ sensor.adres_MAC }}</small><br>
-                    <small>id: {{sensor.id}}</small><br>
                     <small>Measures:</small>
                     {% for measurement_type in sensor.measurement_types %}
                         <small>{{ measurement_type.nazwa_pomiaru }}{% if not forloop.last %}, {% endif %}</small>
