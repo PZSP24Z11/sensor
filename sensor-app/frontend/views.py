@@ -43,7 +43,7 @@ class RegisterUserView(View):
         username = request.POST["username"]
         email = request.POST["email"]
         password = request.POST["password"]
-        email_notification = request.POST["email_notification"] == "on"
+        email_notification = request.POST.get("email_notification", "off") == "on"
         try:
             response = requests.post(
                 f"{API_URL}register_user/",
