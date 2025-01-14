@@ -50,10 +50,15 @@
                     <label class="form-label">Confirm Password</label>
                   </div>
 
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="emailNotification" name="email_notification">
+                    <label class="form-check-label" for="emailNotification">Email notification</label>
+                  </div>
+
                   {% if messages %}
-                    <div class="messages">
-                        {% for message in messages %}
-                          <div class="alert 
+                  <div class="messages">
+                    {% for message in messages %}
+                    <div class="alert 
                               {% if message.tags == 'success' %}
                                   alert-success
                               {% elif message.tags == 'error' %}
@@ -62,10 +67,10 @@
                                   alert-info
                               {% endif %}
                           ">
-                              <p>{{ message }}</p>
-                          </div>
-                        {% endfor %}
+                      <p>{{ message }}</p>
                     </div>
+                    {% endfor %}
+                  </div>
                   {% endif %}
 
 
