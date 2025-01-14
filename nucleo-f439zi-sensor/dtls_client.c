@@ -12,6 +12,12 @@
 #include "net/gnrc/netif.h"
 #include "log.h"
 
+#include <wolfssl/wolfcrypt/asn.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/wolfcrypt/types.h>
+#include "periph/rtc.h"
+#include <time.h>
+
 #define ERR_TIMEOUT -1
 #define ERR_RESPONSE -2
 
@@ -37,9 +43,92 @@ static sock_tls_t tls_socket;
 static sock_tls_t *tls_socket_addr = &tls_socket;
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-int handle_certs(void) {
-	int ret;
 
+int decode_utctime(const unsigned char *bytes, size_t len, struct tm *tm_date) {
+    int year, month, day, hour, minute, second;
+    /* 2 bytes of trailing + 13 bytes of date */
+    if (len != 15) {
+        return -1;
+    }
+
+    int ret = sscanf((char *)bytes, "%2d%2d%2d%2d%2d%2d", &year, &month, &day, &hour, &minute, &second);
+    if (ret != 6) {
+        return ret;
+    }
+
+    if (year < 50) {
+        year += 2000;
+    } else {
+        year += 1900;
+    }
+
+    tm_date->tm_year = year - 1900;
+    tm_date->tm_mon = month - 1;
+    tm_date->tm_mday = day;
+    tm_date->tm_hour = hour;
+    tm_date->tm_min = minute;
+    tm_date->tm_sec = second;
+    tm_date->tm_isdst = -1;
+
+    return 0;
+}
+
+
+int handle_certs(void) {
+    DecodedCert cert;
+	int ret;
+	struct tm tm_before;
+	struct tm tm_after;
+	struct tm tm_rtc;
+	time_t rtc_time_t, before_time_t, after_time_t;
+	char tm_str[50];
+	
+	InitDecodedCert(&cert, ca_der, ca_der_len, NULL);
+	ret = ParseCert(&cert, CERT_TYPE, NO_VERIFY, NULL);
+
+	if (ret != 0) {
+        FreeDecodedCert(&cert);
+        return -1;
+    }
+    
+    ret = decode_utctime(cert.afterDate + 2, cert.afterDateLen, &tm_after);
+    if (ret != 0) {
+        return -1;
+    }
+	strftime(tm_str, sizeof(tm_str), "%Y-%m-%d %H:%M:%S", &tm_after);
+	LOG(LOG_INFO, "Certificate after date: %s\n", tm_str);
+
+    ret = decode_utctime(cert.beforeDate + 2, cert.beforeDateLen, &tm_before);
+    if (ret != 0) {
+        return -1;
+    }
+	strftime(tm_str, sizeof(tm_str), "%Y-%m-%d %H:%M:%S", &tm_before);
+	LOG(LOG_INFO, "Certificate before date: %s\n", tm_str);
+
+	rtc_get_time(&tm_rtc);
+
+	strftime(tm_str, sizeof(tm_str), "%Y-%m-%d %H:%M:%S", &tm_rtc);
+	LOG(LOG_INFO, "Current date: %s\n", tm_str);
+
+	before_time_t = mktime(&tm_before);
+	after_time_t = mktime(&tm_after);
+	rtc_time_t = mktime(&tm_rtc);
+
+	if (before_time_t > rtc_time_t) {
+	    LOG(LOG_ERROR, "Server certificate not yet valid!\n");
+        FreeDecodedCert(&cert);
+	    return -1;
+    }
+
+    if (after_time_t < rtc_time_t ) {
+        LOG(LOG_ERROR, "Server Certificate no longer valid!\n");
+        FreeDecodedCert(&cert);
+        return -1;
+    }
+
+    LOG(LOG_INFO, "Certificate is valid!\n");
+
+    FreeDecodedCert(&cert);
     wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
 	LOG(LOG_INFO, "Loading CA cert\n");
 	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
@@ -59,7 +148,6 @@ int handle_certs(void) {
 
     return 0;
 }
-
 
 int restart_session(void) {
 	sock_dtls_session_destroy(tls_socket_addr);

@@ -21,7 +21,10 @@ int start_sensor(int argc, char **argv) {
 		return -1;
 	}
 
-	initialize_dtls(argv[1]);
+	if (initialize_dtls(argv[1])) {
+	    LOG(LOG_ERROR, "DTLS initialization failed!\n");
+	    return -1;
+    }
 
     if(MOCK_MODE)
     {
