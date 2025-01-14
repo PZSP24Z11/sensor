@@ -8,6 +8,7 @@
             <tr>
                 <th>Username</th>
                 <th>Email</th>
+                <th>Sensor Name</th>
                 <th>Sensor MAC Address</th>
                 <th>Actions</th>
             </tr>
@@ -17,6 +18,7 @@
             <tr id="request-{{ request.id }}">
                 <td>{{ request.username }}</td>
                 <td>{{ request.email }}</td>
+                <td>{{ request.sensor_name }}</td>
                 <td>{{ request.sensor_MAC }}</td>
                 <td>
                     <button onclick="updateRequest( '{{ request.id }}', 'Approved' )" class="btn btn-success btn-sm">Accept</button>
