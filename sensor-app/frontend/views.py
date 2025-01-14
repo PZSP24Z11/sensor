@@ -150,7 +150,7 @@ class AdminView(View):
             messages.error(request, "Error communicating with API")
             return redirect("login")
 
-        return render(request, self.content)
+        return redirect("meaurements")
 
 
 class MeasurementsView(View):
@@ -331,14 +331,12 @@ class UserView(View):
             else:
                 return redirect("login")
 
-            response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
-            username = response.json()["username"]
         except Exception as e:
             print(e)
             messages.error(request, "Error communicating with API")
             return redirect("login")
 
-        return render(request, self.content, {"username": username})
+        return redirect("user-measurements")
 
 
 class UserSensorsView(View):
