@@ -44,4 +44,6 @@
 #define API_REQUEST_ENDPOINT        "http://localhost:8080/sensor/register/"
 #define API_MEASUREMENTS_ENDPOINT   "http://localhost:8080/sensor/measurements/"
 
+#define WAIT_TIME                   60 // time to wait between reqests to api to know if sensor was registered
+
 #endif // CONSTANTS_H

@@ -60,6 +60,7 @@ class RegisterUserView(View):
     def get(self, request: HttpRequest) -> HttpResponse:
         return render(request, "frontend/register.html")
 
+
 class ArchiveView(View):
     def get(self, request: HttpRequest) -> HttpResponse:
         session_id = request.COOKIES.get("session_id")
@@ -68,8 +69,11 @@ class ArchiveView(View):
             return redirect("login")
 
         sensors = get_sensor_list(session_id)
-        print(sensors)
-        return render(request, 'frontend/archive.html', {"sensors": sensors["sensor_list"]})
+
+        response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
+        username = response.json()["username"]
+        return render(request, "frontend/archive.html", {"sensors": sensors["sensor_list"], "username": username})
+
 
 class GetMeasurementsView(View):
     def get(self, request: HttpRequest) -> JsonResponse:
@@ -84,6 +88,7 @@ class GetMeasurementsView(View):
             print(e)
 
         return JsonResponse(status=200, data=response.json())
+
 
 class LoginView(View):
     content = "frontend/login.html"
@@ -433,5 +438,5 @@ class PendingSensorRequests(View):
 
 
 def index(request):
-    print(get_token(request))
-    return render(request, "frontend/index.html")
+    # return render(request, "frontend/index.html")
+    return redirect("login")

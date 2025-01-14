@@ -96,7 +96,7 @@
             let colorIndex = 0;
 
             for (const [type, values] of Object.entries(measurements)) {
-                const data = values.pomiary.map(measurement => measurement.wartosc_pomiaru);
+                const data = values.pomiary.map(measurement => measurement.wartosc_pomiaru / 100);
                 const label = `${type} (${values.jednostka})`;
                 const borderColor = borderColors[colorIndex % borderColors.length];
                 const backgroundColor = colors[colorIndex % colors.length];

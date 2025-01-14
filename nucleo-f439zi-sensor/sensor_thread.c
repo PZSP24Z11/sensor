@@ -60,8 +60,8 @@ void *mock_measurements_thread_function(void *arg)
 
     while (1)    
     {
-        temp += 20;
-        hum += 10;
+        temp += 2;
+        hum += 1;
         
         sprintf(temp_str, "%d", temp);
         sprintf(hum_str, "%d", hum);

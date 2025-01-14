@@ -28,7 +28,7 @@ from apiserver.anomaly_notifier import send_anomaly_mail
 from django.views import View
 
 
-type_map = {"T": ("Temperature", "u00B0C"), "H": ("Humidity", "%")}
+type_map = {"T": ("Temperature", "\u00B0C"), "H": ("Humidity", "%")}
 
 
 def get_user_from_session(session_key: str) -> Uzytkownik:
@@ -52,7 +52,7 @@ def get_measurement_types(sensor_id: int) -> Optional[list[str]]:
         return None
 
 
-def get_latest_measurements(sensor_id: int, max: int = 7):
+def get_latest_measurements(sensor_id: int, max: int = 20):
     sensor = Sensor.objects.get(id=sensor_id)
     measurement_types = TypPomiaru.objects.filter(
         id__in=SensorTypPomiaru.objects.filter(sensor=sensor).values_list("typ_pomiaru_id", flat=True)
@@ -163,12 +163,12 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
                     full_name = m_type[0]
                     if full_name:
                         measurement_type, _ = TypPomiaru.objects.get_or_create(
-                            nazwa_pomiaru=full_name, jednostka=m_type
+                            nazwa_pomiaru=full_name, jednostka=m_type[1]
                         )
                         SensorTypPomiaru.objects.get_or_create(sensor=sensor, typ_pomiaru=measurement_type)
                 return HttpResponse("1")
             except Sensor.DoesNotExist:
-                if not SensorRequest.objects.filter(adres_MAC=mac_address).exclude(status="Pending").exists():
+                if not SensorRequest.objects.filter(adres_MAC=mac_address).exclude(status="Approved").exists():
                     random_chars = "".join(random.choices(string.ascii_letters + string.digits, k=7))
                     current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                     name = f"{random_chars}_{current_datetime}"
@@ -203,7 +203,7 @@ def measurements_register_view(request: HttpRequest) -> HttpResponse:
 
             measurements_data = re.findall(r"([A-Za-z])(\d+)", measurements)
             for measurement_type, value in measurements_data:
-                full_name = type_map.get(measurement_type.upper())
+                full_name = type_map.get(measurement_type.upper())[0]
                 if not full_name:
                     return HttpResponse("3")
 

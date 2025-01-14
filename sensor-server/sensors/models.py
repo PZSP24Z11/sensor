@@ -70,7 +70,7 @@ class Pomiar(models.Model):
 
 class SensorRequest(models.Model):
     nazwa_sensora = models.CharField(max_length=255)
-    adres_MAC = models.CharField(max_length=100, unique=True)
+    adres_MAC = models.CharField(max_length=100)
     status = models.CharField(
         max_length=20,
         choices=[("Pending", "Pending"), ("Approved", "Approved"), ("Rejected", "Rejected")],

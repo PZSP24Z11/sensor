@@ -18,15 +18,16 @@
 
 
 int handle_client(WOLFSSL* ssl, CURL* curl) {
-    int recv_len    = 0;
-    int state       = S_RECIEVE_REQUEST;
-    int cont        = 1;
-    int response    = 0;
-    char            buff[MSGLEN];
-    char            err[] = "ERR";
-    char            ack[] = "ACK";
-    char            sns_acc[] = "SENSORACC";
+    int             recv_len        = 0;
+    int             state           = S_RECIEVE_REQUEST;
+    int             cont            = 1;
+    int             response        = 0;
+    char            err[]           = "ERR";
+    char            ack[]           = "ACK";
+    char            sns_acc[]       = "SENSORACC";
+    char            sns_reg[]       = "SREGSUB"; // sensor registration is submitted, waiting for api acceptance to sens SENSORACC
     char            mac[MAC_LEN+1];
+    char            buff[MSGLEN];
 
 
     while (cont) {
@@ -48,7 +49,6 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
                 state = ES_READ_FAILED;
             }
 
-            // for dev
             buff[recv_len] = 0;
 
             if ((recv_len <= MIN_SREQ_LEN && MAX_SREQ_LEN <= recv_len) || !validate_sreq(buff, recv_len)){
@@ -73,9 +73,8 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
                 state = S_SEND_SENSOR_ACCEPT;
                 break;
             case SENSOR_REG_SUB:
-				// state = S_SEND_REQUEST_SUBMITED;
                 printf("API server registered sensor\n");
-				state = S_SEND_SENSOR_ACCEPT;
+				state = S_SEND_REQUEST_SUBMITED;
                 break;
             case BAD_REQUEST:
                 state = ES_API_COMMUNICATION_BAD_REQUEST;
@@ -141,9 +140,13 @@ int handle_client(WOLFSSL* ssl, CURL* curl) {
             break;
 
         case S_SEND_REQUEST_SUBMITED:
-            state = S_RECIEVE_MEASUREMENTS;
+            if (wolfSSL_write(ssl, sns_reg, sizeof(sns_reg)) < 0) {
+                state = ES_WRITE_FAILED;
+            } else {
+                sleep(WAIT_TIME);
+                state = S_SEND_REQUEST_TO_SERVER;
+            }
             break;
-            // later to be implemented
 
         case S_DONE:
             cont = 0;
