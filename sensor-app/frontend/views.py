@@ -43,9 +43,16 @@ class RegisterUserView(View):
         username = request.POST["username"]
         email = request.POST["email"]
         password = request.POST["password"]
+        email_notification = request.POST["email_notification"] == "on"
         try:
             response = requests.post(
-                f"{API_URL}register_user/", json={"username": username, "email": email, "password": password}
+                f"{API_URL}register_user/",
+                json={
+                    "username": username,
+                    "email": email,
+                    "password": password,
+                    "email_notification": email_notification,
+                },
             )
 
             if response.status_code < 400:

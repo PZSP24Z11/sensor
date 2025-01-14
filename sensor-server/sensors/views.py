@@ -29,7 +29,7 @@ from apiserver.anomaly_notifier import send_anomaly_mail
 from django.views import View
 
 
-type_map = {"T": ("Temperature", "\u00B0C"), "H": ("Humidity", "%")}
+type_map = {"T": ("Temperature", "\u00b0C"), "H": ("Humidity", "%")}
 
 
 def get_user_from_session(session_key: str) -> Uzytkownik:
@@ -221,14 +221,17 @@ class MeasurementsRegisterView(View):
                     except TypPomiaru.DoesNotExist:
                         return HttpResponse("3")
 
-                    is_allowed = SensorTypPomiaru.objects.filter(sensor=sensor, typ_pomiaru=measurement_type_obj).exists()
+                    is_allowed = SensorTypPomiaru.objects.filter(
+                        sensor=sensor, typ_pomiaru=measurement_type_obj
+                    ).exists()
                     if not is_allowed:
                         return HttpResponse("3")
 
-                    average_pomiar_value = Pomiar.objects.filter(
-                        sensor=sensor, 
-                        typ_pomiaru=measurement_type_obj
-                        ).order_by('-data_pomiaru')[:50].aggregate(Avg('wartosc_pomiaru'))['wartosc_pomiaru__avg']
+                    average_pomiar_value = (
+                        Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type_obj)
+                        .order_by("-data_pomiaru")[:50]
+                        .aggregate(Avg("wartosc_pomiaru"))["wartosc_pomiaru__avg"]
+                    )
                     Pomiar.objects.create(
                         sensor=sensor,
                         typ_pomiaru=measurement_type_obj,
@@ -279,7 +282,12 @@ class RegisterUserView(View):
     def post(self, request: HttpRequest) -> JsonResponse:
         try:
             data = json.loads(request.body)
-            username, password, email = data.get("username"), data.get("password"), data.get("email")
+            username, password, email, email_notification = (
+                data.get("username"),
+                data.get("password"),
+                data.get("email"),
+                data.get("email_notification"),
+            )
             status, message = 201, "Client registered"
 
             if not all((username, password, email)):
@@ -289,7 +297,7 @@ class RegisterUserView(View):
                 status = 400
                 message = f"Username {username} already exist"
             else:
-                Uzytkownik.objects.create_user(username, password, email=email)
+                Uzytkownik.objects.create_user(username, password, email=email, email_notification=email_notification)
         except json.JSONDecodeError as e:
             print(e)
             status = 400
@@ -346,14 +354,12 @@ class GetMeasurementsView(View):
             for reading in result
         ]
 
-        return JsonResponse(
-            {
-                "results": readings_data,
-                "count": paginator.count,
-                "num_pages": paginator.num_pages,
-                "current_page": result.number,
-            }
-        )
+        return JsonResponse({
+            "results": readings_data,
+            "count": paginator.count,
+            "num_pages": paginator.num_pages,
+            "current_page": result.number,
+        })
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -625,16 +631,14 @@ class PendingPermissionRequestsView(View):
             for prequest in permission_requests:
                 sensor = Sensor.objects.get(id=prequest.sensor.id)
                 user = Uzytkownik.objects.get(id=prequest.uzytkownik.id)
-                response_data.append(
-                    {
-                        "id": prequest.id,
-                        "username": user.username,
-                        "email": user.email,
-                        "sensor_name": sensor.nazwa_sensora,
-                        "sensor_MAC": sensor.adres_MAC,
-                        "status": prequest.status,
-                    }
-                )
+                response_data.append({
+                    "id": prequest.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "sensor_name": sensor.nazwa_sensora,
+                    "sensor_MAC": sensor.adres_MAC,
+                    "status": prequest.status,
+                })
 
             return JsonResponse(status=200, data={"p_requests": response_data})
         except Session.DoesNotExist:
