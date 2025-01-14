@@ -17,10 +17,10 @@ CHECK_FLAGS = -lcheck -lm -lsubunit
 all: $(OUT)
 
 $(OUT): $(SRC) $(HEADERS)
-	export LD_LIBRARY_PATH=/usr/local/lib:$$LD_LIBRARY_PATH && \
 	$(CC) $(SRC) $(WOLFSSL_FLAGS) $(CURL_FLAGS) -o $(OUT)
 
 run: all
+	export LD_LIBRARY_PATH=/usr/local/lib:$$LD_LIBRARY_PATH && \
 	./$(OUT)
 
 test: $(TEST_OUT)

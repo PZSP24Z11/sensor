@@ -43,18 +43,20 @@ def get_latest_pomiary_dict_by_mac(sensor: Sensor) -> str:
 
 
 def send_anomaly_mail(sensor: Sensor, users: Uzytkownik.objects) -> bool:
-    print("in send anomaly mail")
-    user_names = [user.email for user in users]
-    print(user_names)
-    recepients = ', '.join(user_names)
-    msg = _set_message_contents(sensor)
-    msg['Subject'] = "Anomaly detected in one of your sensors!"
-    msg['From'] = MAIL_SENDER
-    msg['To'] = recepients
+    try:
+        user_names = [user.email for user in users]
+        recepients = ', '.join(user_names)
+        msg = _set_message_contents(sensor)
+        msg['Subject'] = "Anomaly detected in one of your sensors!"
+        msg['From'] = MAIL_SENDER
+        msg['To'] = recepients
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL('smtp.mailgun.org', 465, context=context) as s:
-        s.login(SMTP_LOGIN, SMTP_PASSWD)
-        s.send_message(msg)
-        print("message sent!")
-    return True
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL('smtp.mailgun.org', 465, context=context) as s:
+            s.login(SMTP_LOGIN, SMTP_PASSWD)
+            s.send_message(msg)
+            print("message sent!")
+        return True
+    except Exception as e:
+        print(e)
+        return False

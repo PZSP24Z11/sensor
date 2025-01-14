@@ -60,7 +60,12 @@
 
     function fetchSensorData() {
         const url = `http://localhost:8000/user/archive/measurements/?sensor_id=${currentSensorId}&type=${currentTypeId}&page=${currentPage}`;
-        fetch(url)
+        fetch(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
             .then(response => response.json())
             .then(data => {
                 const tableBody = document.getElementById('sensorReadingsBody');
