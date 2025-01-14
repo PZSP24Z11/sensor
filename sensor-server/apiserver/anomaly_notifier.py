@@ -2,7 +2,7 @@ import smtplib
 import ssl
 from sensors.models import Sensor, Uzytkownik, Pomiar
 from django.db.models import Max
-from mailcreds import SMTP_LOGIN, SMTP_PASSWD
+from mailcreds import SMTP_LOGIN, SMTP_PASSWD, MAIL_SENDER
 
 from email.message import EmailMessage
 
@@ -11,7 +11,7 @@ def _set_message_contents(sensor: Sensor) -> EmailMessage:
     msg = EmailMessage()
     value_string = get_latest_pomiary_dict_by_mac(sensor)
     message = f"""The sensor {sensor.nazwa_sensora} has received an anomaly alert!
-    Current value is: {value_string}
+    Current value is: \n\t{value_string}
     """
     msg.set_content(message)
     return msg
@@ -35,19 +35,21 @@ def get_latest_pomiary_dict_by_mac(sensor: Sensor) -> str:
         }
         
         msg = ''
-        for item in latest_pomiary_dict:
-            msg += f"\n{item}: {latest_pomiary_dict[item]}"
+        for item_dict in latest_pomiary_dict:
+            msg += f"\n{item_dict}: {(float(latest_pomiary_dict[item_dict]) / 100):.2f}"
         return msg
     except Exception as e:
         return str(e)
 
 
 def send_anomaly_mail(sensor: Sensor, users: Uzytkownik.objects) -> bool:
+    print("in send anomaly mail")
     user_names = [user.email for user in users]
+    print(user_names)
     recepients = ', '.join(user_names)
     msg = _set_message_contents(sensor)
     msg['Subject'] = "Anomaly detected in one of your sensors!"
-    msg['From'] = "sensorpzsp@gmail.com"
+    msg['From'] = MAIL_SENDER
     msg['To'] = recepients
 
     context = ssl.create_default_context()

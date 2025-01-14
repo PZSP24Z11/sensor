@@ -19,6 +19,7 @@ import json
 from django.shortcuts import render, redirect
 from django.middleware.csrf import get_token
 from django.core.paginator import Paginator
+from django.db.models import Avg
 import re
 import string
 import random
@@ -83,12 +84,15 @@ def validate_user_permission(user_id: int, sensor_id: str) -> bool:
 
 def _get_users_with_notifications_by_mac(mac_address: str) -> Uzytkownik.objects:
     return Uzytkownik.objects.filter(
-        powiadomienie_email=True, uzytkowniksensor__sensor__adres_MAC=mac_address
+        email_notification=True, uzytkowniksensor__sensor__adres_MAC=mac_address
     ).distinct()
 
 
 def handle_anomaly(sensor: Sensor) -> None:
     users = _get_users_with_notifications_by_mac(sensor.adres_MAC)
+    if not users:
+        print("Anomaly found but no users notified (none connected with e-mail notifications on)")
+        return
     send_anomaly_mail(sensor, users)
 
 
@@ -135,7 +139,7 @@ def add_user(request: HttpRequest) -> JsonResponse:
             nazwa_uzytkownika=data["name"],
             haslo=make_password(data["password"]),
             email=data["email"],
-            powiadomienie_email=data["wants_emails"],
+            email_notification=data["wants_emails"],
         )
         return JsonResponse({"message": "User created successfully"}, status=201)
     except Exception as e:
@@ -183,51 +187,69 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
     return HttpResponse("3")
 
 
-@csrf_exempt
-def measurements_register_view(request: HttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        try:
-            data = request.body.decode("utf-8")
+@method_decorator(csrf_exempt, name="dispatch")
+class MeasurementsRegisterView(View):
+    def __init__(self) -> None:
+        self._anomaly_cooldown = 0
 
-            match = re.match(r"([a-fA-F0-9:]+)%((?:[A-Za-z]\d+%?)+)", data)
-            if not match:
-                return HttpResponse("3")
-
-            mac_address = match.group(1)
-            measurements = match.group(2)
-
+    def post(self, request: HttpRequest) -> HttpResponse:
+        if request.method == "POST":
             try:
-                sensor = Sensor.objects.get(adres_MAC=mac_address)
-            except Sensor.DoesNotExist:
-                return HttpResponse("3")
+                print("in register view")
+                data = request.body.decode("utf-8")
 
-            measurements_data = re.findall(r"([A-Za-z])(\d+)", measurements)
-            for measurement_type, value in measurements_data:
-                full_name = type_map.get(measurement_type.upper())[0]
-                if not full_name:
+                match = re.match(r"([a-fA-F0-9:]+)%((?:[A-Za-z]\d+%?)+)", data)
+                if not match:
                     return HttpResponse("3")
+
+                mac_address = match.group(1)
+                measurements = match.group(2)
 
                 try:
-                    measurement_type_obj = TypPomiaru.objects.get(nazwa_pomiaru=full_name)
-                except TypPomiaru.DoesNotExist:
+                    sensor = Sensor.objects.get(adres_MAC=mac_address)
+                except Sensor.DoesNotExist:
                     return HttpResponse("3")
 
-                is_allowed = SensorTypPomiaru.objects.filter(sensor=sensor, typ_pomiaru=measurement_type_obj).exists()
-                if not is_allowed:
-                    return HttpResponse("3")
-                Pomiar.objects.create(
-                    sensor=sensor,
-                    typ_pomiaru=measurement_type_obj,
-                    wartosc_pomiaru=float(value),
-                    data_pomiaru=datetime.now(),
-                )
+                measurements_data = re.findall(r"([A-Za-z])(\d+)", measurements)
+                for measurement_type, value in measurements_data:
+                    full_name = type_map.get(measurement_type.upper())[0]
+                    if not full_name:
+                        return HttpResponse("3")
 
-            return HttpResponse("2")
+                    try:
+                        measurement_type_obj = TypPomiaru.objects.get(nazwa_pomiaru=full_name)
+                    except TypPomiaru.DoesNotExist:
+                        return HttpResponse("3")
 
-        except Exception:
-            return HttpResponse("3")
+                    is_allowed = SensorTypPomiaru.objects.filter(sensor=sensor, typ_pomiaru=measurement_type_obj).exists()
+                    if not is_allowed:
+                        return HttpResponse("3")
 
-    return HttpResponse("3")
+                    average_pomiar_value = Pomiar.objects.filter(
+                        sensor=sensor, 
+                        typ_pomiaru=measurement_type_obj
+                        ).order_by('-data_pomiaru')[:50].aggregate(Avg('wartosc_pomiaru'))['wartosc_pomiaru__avg']
+                    Pomiar.objects.create(
+                        sensor=sensor,
+                        typ_pomiaru=measurement_type_obj,
+                        wartosc_pomiaru=float(value),
+                        data_pomiaru=datetime.now(),
+                    )
+                    print(f"average reading: {average_pomiar_value}")
+                    print(f"this reading: {float(value)}")
+                    if float(value) >= 1.1 * average_pomiar_value and not self._anomaly_cooldown:
+                        self._anomaly_cooldown = 100
+                        print("ANOMALY DETECTED!")
+                        handle_anomaly(sensor)
+                    self._anomaly_cooldown -= 1
+
+                return HttpResponse("2")
+
+            except Exception as e:
+                print(e)
+                return HttpResponse("3")
+
+        return HttpResponse("3")
 
 
 def sensors_list_view(request: HttpRequest) -> HttpResponse:

@@ -20,7 +20,7 @@ from django.urls import path, include
 from sensors.views import (
     get_last_pomiar,
     sensor_register_view,
-    measurements_register_view,
+    MeasurementsRegisterView,
     index_view,
     add_user,
     force_anomaly,
@@ -49,7 +49,7 @@ urlpatterns = [
     path("api/add_user/", add_user, name="add_user"),
     path("api/force_anomaly/", force_anomaly, name="force_anomaly"),
     path("sensor/register/", sensor_register_view, name="sensor_register"),
-    path("sensor/measurements/", measurements_register_view, name="measurements_register"),
+    path("sensor/measurements/", MeasurementsRegisterView.as_view(), name="measurements_register"),
     path("api/register_user/", RegisterUserView.as_view(), name="api-register-user"),
     path("api/get_measurements/", GetMeasurementsView.as_view(), name="api-get-measurements"),
     path("api/login/", LoginView.as_view(), name="api-login"),
