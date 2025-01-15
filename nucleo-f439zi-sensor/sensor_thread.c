@@ -6,9 +6,13 @@
 #include "log.h"
 #include "ztimer.h"
 
-dht_t sensor;
 extern int16_t hum;
 extern int16_t temp;
+
+extern bool hadError;
+extern bool isSending;
+extern bool isActive;
+extern bool configured;
 
 extern int send_readings(const char *readings[]);
 
@@ -21,26 +25,19 @@ void *gather_measurements_thread_function(void *arg)
     char hum_data[READING_LEN] = "HXXX0";
     while (1)    
     {
-        if(dht_read(&sensor, &temp, &hum) == DHT_OK)
-        {        
-            sprintf(temp_str, "%d", temp);
-            sprintf(hum_str, "%d", hum);
-            strncpy(&temp_data[1], temp_str, 3);
-            strncpy(&hum_data[1], hum_str, 3);
-            const char* readings[NUM_READINGS] = {temp_data, hum_data};
+        sprintf(temp_str, "%d", temp);
+        sprintf(hum_str, "%d", hum);
+        strncpy(&temp_data[1], temp_str, 3);
+        strncpy(&hum_data[1], hum_str, 3);
+        const char* readings[NUM_READINGS] = {temp_data, hum_data};
 
-            if(send_readings(readings) == 0)
-            {
-                LOG(LOG_INFO, "Data sent to server: %s, %s\n", temp_data, hum_data);
-            }
-            else
-            {
-                LOG(LOG_ERROR, "Error sending data to server: %s, %s\n", temp_data, hum_data);
-            }
+        if(send_readings(readings) == 0)
+        {
+            LOG(LOG_INFO, "Data sent to server: %s, %s\n", temp_data, hum_data);
         }
         else
         {
-            LOG(LOG_ERROR, "Error reading sensor output\n");
+            LOG(LOG_ERROR, "Error sending data to server: %s, %s\n", temp_data, hum_data);
         }
         ztimer_sleep(ZTIMER_MSEC, SAMPLE_RATE);
     }
@@ -71,6 +68,7 @@ void *mock_measurements_thread_function(void *arg)
 
         if(send_readings(readings) == 0)
         {
+
             LOG(LOG_INFO, "Data sent to server: %s, %s\n", temp_data, hum_data);
         }
         else
@@ -87,7 +85,7 @@ void *mock_measurements_thread_function(void *arg)
 void start_gather_measurements_thread(void)
 {
     {
-        static char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
+        static char gather_thread_stack[THREAD_STACKSIZE_MAIN];
         thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 1, 0, 
                     gather_measurements_thread_function, NULL, "gather_measurements_thread_function");
     }
@@ -96,18 +94,9 @@ void start_gather_measurements_thread(void)
 void start_mock_measurements_thread(void)
 {
     {
-        static char gather_thread_stack[THREAD_STACKSIZE_DEFAULT];
+        static char gather_thread_stack[THREAD_STACKSIZE_MAIN];
         thread_create(gather_thread_stack, sizeof(gather_thread_stack), THREAD_PRIORITY_MAIN - 1, 0,
                     mock_measurements_thread_function, NULL, "mock_measurements_thread_function");
     }
 }
 
-void initialize_sensor(void)
-{
-    LOG(LOG_INFO, "Initializing sensor... \n");
-    if (dht_init(&sensor, &dht_params[0]) == DHT_OK) {
-        LOG(LOG_INFO, "Sensor Initialized\n");
-    } else {
-        LOG(LOG_INFO, "Failed to Initialize Sensor\n");
-    }
-}
