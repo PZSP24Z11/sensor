@@ -5,6 +5,13 @@
     <div class="col-md-8">
         <div class="card p-3">
             <h5>Measurements</h5>
+            <div class="btn-group mb-3" role="group" aria-label="Time Range Buttons">
+                <button type="button" class="btn btn-secondary time-range-btn" data-range="lastWeek">Last Week</button>
+                <button type="button" class="btn btn-secondary time-range-btn" data-range="lastHour">Last Hour</button>
+                <button type="button" class="btn btn-secondary time-range-btn" data-range="lastMinute">Last
+                    Minute</button>
+                <button type="button" class="btn btn-secondary time-range-btn" data-range="live">Live</button>
+            </div>
             <canvas id="sensorChart"></canvas>
         </div>
     </div>
@@ -15,16 +22,14 @@
             </div>
             <div id="sensorList">
                 {% for sensor in sensors %}
-                <button class="sensor-card w-100"
-                    data-id="{{ sensor.id }}"
-                    data-nazwa="{{ sensor.nazwa_sensora }}"
+                <button class="sensor-card w-100" data-id="{{ sensor.id }}" data-nazwa="{{ sensor.nazwa_sensora }}"
                     data-mac="{{ sensor.adres_MAC }}">
                     <strong>{{ sensor.nazwa_sensora }}</strong><br>
                     <small>{{ sensor.adres_MAC }}</small><br>
-                    <small>id: {{sensor.id}}</small><br>
+                    <small>id: {{ sensor.id }}</small><br>
                     <small>Measures:</small>
                     {% for measurement_type in sensor.measurement_types %}
-                        <small>{{ measurement_type.nazwa_pomiaru }}{% if not forloop.last %}, {% endif %}</small>
+                    <small>{{ measurement_type.nazwa_pomiaru }}{% if not forloop.last %}, {% endif %}</small>
                     {% endfor %}
                 </button>
                 {% endfor %}
@@ -34,25 +39,46 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const sensorCards = document.querySelectorAll('.sensor-card');
+        const timeRangeButtons = document.querySelectorAll('.time-range-btn');
         let selectedSensorCard = null;
+        let selectedTimeRange = 'live';
+
+        timeRangeButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                timeRangeButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                selectedTimeRange = button.getAttribute('data-range');
+
+                if (selectedSensorCard) {
+                    fetchMeasurements(selectedSensorCard.getAttribute('data-id'));
+                }
+            });
+        });
 
         sensorCards.forEach(card => {
-            card.addEventListener('click', function() {
+            card.addEventListener('click', function () {
                 sensorCards.forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 selectedSensorCard = card;
 
-                const sensorId = card.getAttribute('data-id');
-                fetch('/latest_sensor_measurements/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({ id: sensorId })
+                fetchMeasurements(card.getAttribute('data-id'));
+            });
+        });
+
+        function fetchMeasurements(sensorId) {
+            fetch('/latest_sensor_measurements/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    id: sensorId,
+                    range: selectedTimeRange
                 })
+            })
                 .then(response => response.json())
                 .then(data => {
                     updateChart(data.measurements);
@@ -60,16 +86,15 @@
                 .catch((error) => {
                     console.error('Error:', error);
                 });
-            });
-        });
+        }
 
         if (sensorCards.length > 0) {
             sensorCards[0].click();
         }
 
         setInterval(() => {
-            if (selectedSensorCard) {
-                selectedSensorCard.click();
+            if (selectedTimeRange === 'live' && selectedSensorCard) {
+                fetchMeasurements(selectedSensorCard.getAttribute('data-id'));
             }
         }, 10000);
 
@@ -93,6 +118,13 @@
                 'rgba(255, 159, 64, 1)'
             ];
 
+            let timeFormatter;
+            if (selectedTimeRange === 'lastWeek') {
+                timeFormatter = dt => new Date(dt).toLocaleDateString();
+            } else {
+                timeFormatter = dt => new Date(dt).toLocaleTimeString();
+            }
+
             let colorIndex = 0;
 
             for (const [type, values] of Object.entries(measurements)) {
@@ -111,7 +143,7 @@
 
                 if (labels.length === 0) {
                     values.pomiary.forEach(measurement => {
-                        labels.push(new Date(measurement.data_pomiaru).toLocaleTimeString());
+                        labels.push(timeFormatter(measurement.data_pomiaru));
                     });
                 }
 
