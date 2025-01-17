@@ -7,11 +7,11 @@
             <h5>Measurements</h5>
             <div class="btn-group mb-3" role="group" aria-label="Time Range Buttons">
                 <button type="button" class="btn btn-secondary time-range-btn" data-range="lastWeek">Last Week</button>
+                <button type="button" class="btn btn-secondary time-range-btn" data-range="lastDay">Last Day</button>
                 <button type="button" class="btn btn-secondary time-range-btn" data-range="lastHour">Last Hour</button>
-                <button type="button" class="btn btn-secondary time-range-btn" data-range="lastMinute">Last
-                    Minute</button>
                 <button type="button" class="btn btn-secondary time-range-btn" data-range="live">Live</button>
             </div>
+
             <canvas id="sensorChart"></canvas>
         </div>
     </div>
@@ -124,6 +124,7 @@
             } else {
                 timeFormatter = dt => new Date(dt).toLocaleTimeString();
             }
+
 
             let colorIndex = 0;
 
