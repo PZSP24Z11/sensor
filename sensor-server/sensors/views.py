@@ -30,7 +30,7 @@ from django.views import View
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Avg
-from django.db.models.functions import TruncDay, TruncHour
+from django.db.models.functions import TruncDay, TruncHour, TruncMinute
 
 
 type_map = {"T": ("Temperature", "\u00b0C"), "H": ("Humidity", "%")}
@@ -99,11 +99,28 @@ def get_latest_measurements(sensor_id: int, time_range: str = "live", max: int =
             }
         return latest_measurements
 
+    elif time_range == "lastHour":
+        cutoff = now - timedelta(hours=1)
+        for measurement_type in measurement_types:
+            qs = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type, data_pomiaru__gte=cutoff)
+            grouped = (
+                qs.annotate(minute=TruncMinute("data_pomiaru"))
+                .values("minute")
+                .annotate(avg=Avg("wartosc_pomiaru"))
+                .order_by("minute")
+            )
+            measurements = [{"wartosc_pomiaru": item["avg"], "data_pomiaru": item["minute"]} for item in grouped]
+            latest_measurements[measurement_type.nazwa_pomiaru] = {
+                "jednostka": measurement_type.jednostka,
+                "pomiary": measurements,
+            }
+        return latest_measurements
+
     else:
-        if time_range == "lastHour":
-            cutoff = now - timedelta(hours=1)
-        else:
+        if time_range == "live":
             cutoff = None
+        else:
+            cutoff = now - timedelta(hours=1)
 
         for measurement_type in measurement_types:
             qs = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type)
