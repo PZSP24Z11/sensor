@@ -27,6 +27,10 @@ from datetime import datetime
 from django.contrib.auth.decorators import login_required
 from apiserver.anomaly_notifier import send_anomaly_mail
 from django.views import View
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Avg
+from django.db.models.functions import TruncDay, TruncHour, TruncMinute
 
 
 type_map = {"T": ("Temperature", "\u00b0C"), "H": ("Humidity", "%")}
@@ -53,22 +57,81 @@ def get_measurement_types(sensor_id: int) -> Optional[list[str]]:
         return None
 
 
-def get_latest_measurements(sensor_id: int, max: int = 20):
+def get_latest_measurements(sensor_id: int, time_range: str = "live", max: int = 20) -> dict:
     sensor = Sensor.objects.get(id=sensor_id)
     measurement_types = TypPomiaru.objects.filter(
         id__in=SensorTypPomiaru.objects.filter(sensor=sensor).values_list("typ_pomiaru_id", flat=True)
     )
-
+    now = timezone.now()
     latest_measurements = {}
-    for measurement_type in measurement_types:
-        measurements = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type).order_by("-data_pomiaru")[
-            :max
-        ]
-        latest_measurements[measurement_type.nazwa_pomiaru] = {
-            "jednostka": measurement_type.jednostka,
-            "pomiary": list(measurements.values())[::-1],
-        }
-    return latest_measurements
+
+    if time_range == "lastWeek":
+        cutoff = now - timedelta(weeks=1)
+        for measurement_type in measurement_types:
+            qs = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type, data_pomiaru__gte=cutoff)
+            grouped = (
+                qs.annotate(day=TruncDay("data_pomiaru"))
+                .values("day")
+                .annotate(avg=Avg("wartosc_pomiaru"))
+                .order_by("day")
+            )
+            measurements = [{"wartosc_pomiaru": item["avg"], "data_pomiaru": item["day"]} for item in grouped]
+            latest_measurements[measurement_type.nazwa_pomiaru] = {
+                "jednostka": measurement_type.jednostka,
+                "pomiary": measurements,
+            }
+        return latest_measurements
+
+    elif time_range == "lastDay":
+        cutoff = now - timedelta(days=1)
+        for measurement_type in measurement_types:
+            qs = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type, data_pomiaru__gte=cutoff)
+            grouped = (
+                qs.annotate(hour=TruncHour("data_pomiaru"))
+                .values("hour")
+                .annotate(avg=Avg("wartosc_pomiaru"))
+                .order_by("hour")
+            )
+            measurements = [{"wartosc_pomiaru": item["avg"], "data_pomiaru": item["hour"]} for item in grouped]
+            latest_measurements[measurement_type.nazwa_pomiaru] = {
+                "jednostka": measurement_type.jednostka,
+                "pomiary": measurements,
+            }
+        return latest_measurements
+
+    elif time_range == "lastHour":
+        cutoff = now - timedelta(hours=1)
+        for measurement_type in measurement_types:
+            qs = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type, data_pomiaru__gte=cutoff)
+            grouped = (
+                qs.annotate(minute=TruncMinute("data_pomiaru"))
+                .values("minute")
+                .annotate(avg=Avg("wartosc_pomiaru"))
+                .order_by("minute")
+            )
+            measurements = [{"wartosc_pomiaru": item["avg"], "data_pomiaru": item["minute"]} for item in grouped]
+            latest_measurements[measurement_type.nazwa_pomiaru] = {
+                "jednostka": measurement_type.jednostka,
+                "pomiary": measurements,
+            }
+        return latest_measurements
+
+    else:
+        if time_range == "live":
+            cutoff = None
+        else:
+            cutoff = now - timedelta(hours=1)
+
+        for measurement_type in measurement_types:
+            qs = Pomiar.objects.filter(sensor=sensor, typ_pomiaru=measurement_type)
+            if cutoff:
+                qs = qs.filter(data_pomiaru__gte=cutoff)
+            measurements = qs.order_by("-data_pomiaru")[:max]
+            latest_measurements[measurement_type.nazwa_pomiaru] = {
+                "jednostka": measurement_type.jednostka,
+                "pomiary": list(measurements.values())[::-1],
+            }
+        return latest_measurements
 
 
 def validate_user_permission(user_id: int, sensor_id: str) -> bool:
@@ -477,9 +540,12 @@ class LatestSensorMeasurementsView(View):
 
             data = json.loads(request.body)
             sensor_id = data.get("sensor_id")
+            time_range = data.get("range")
+
             if not validate_user_permission(user.id, sensor_id):
-                return JsonResponse(status=401, data={"message": "User doesnt have permission"})
-            measurements = get_latest_measurements(sensor_id)
+                return JsonResponse(status=401, data={"message": "User doesn't have permission"})
+
+            measurements = get_latest_measurements(sensor_id, time_range)
             return JsonResponse(status=200, data={"measurements": measurements})
         except Session.DoesNotExist:
             return JsonResponse(status=401, data={"message": "Invalid session_id"})

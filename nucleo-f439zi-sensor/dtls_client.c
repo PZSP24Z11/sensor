@@ -12,6 +12,9 @@
 #include "net/gnrc/netif.h"
 #include "log.h"
 
+#include "dht.h"
+#define LED_ACK             (GPIO_PIN(PORT_E, 5))
+
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 #include <wolfssl/wolfcrypt/types.h>
@@ -43,6 +46,12 @@ static uint16_t netif_pid;
 static sock_tls_t tls_socket;
 static sock_tls_t *tls_socket_addr = &tls_socket;
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+
+extern bool hadError;
+extern bool isSending;
+extern bool isActive;
+extern bool configured;
+
 
 int decode_utctime(const unsigned char *bytes, size_t len, struct tm *tm_date) {
     int year, month, day, hour, minute, second;
@@ -307,8 +316,8 @@ int send_readings(char *readings[]) {
 
 		/* re-send packet every iteration */
 		ret = wolfSSL_write(tls_socket_addr->ssl, buf, strlen(buf));
-		LOG(LOG_INFO, "Sensor readings sent: %d characters\n", ret);
-		LOG(LOG_INFO, "Awaiting server ACK...\n");
+		// LOG(LOG_INFO, "Sensor readings sent: %d characters\n", ret);
+		// LOG(LOG_INFO, "Awaiting server ACK...\n");
 
 		/* Read into the ack buf */
 		ret = wolfSSL_read(tls_socket_addr->ssl, ack_buf, 4);
@@ -340,6 +349,10 @@ int send_readings(char *readings[]) {
 	} while (!ack);
 
 	LOG(LOG_INFO, "ACK received\n");
+	gpio_set(LED_ACK);
+    ztimer_sleep(ZTIMER_MSEC, 100);
+	gpio_clear(LED_ACK);
+
 	return 0;
 }
 

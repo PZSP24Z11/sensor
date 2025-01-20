@@ -150,7 +150,7 @@ class AdminView(View):
             messages.error(request, "Error communicating with API")
             return redirect("login")
 
-        return render(request, self.content)
+        return redirect("measurements")
 
 
 class MeasurementsView(View):
@@ -331,14 +331,12 @@ class UserView(View):
             else:
                 return redirect("login")
 
-            response = requests.get(f"{API_URL}get_username/", cookies={"session_id": session_id})
-            username = response.json()["username"]
         except Exception as e:
             print(e)
             messages.error(request, "Error communicating with API")
             return redirect("login")
 
-        return render(request, self.content, {"username": username})
+        return redirect("user-measurements")
 
 
 class UserSensorsView(View):
@@ -410,15 +408,17 @@ class LatestSensorMeasurementsView(View):
         try:
             data = json.loads(request.body)
             sensor_id = data.get("id")
+            time_range = data.get("range")
+
             response = requests.post(
                 f"{API_URL}latest_sensor_measurements/",
-                json={"sensor_id": sensor_id},
+                json={"sensor_id": sensor_id, "range": time_range},
                 cookies={"session_id": session_id},
             )
 
             response_data = response.json()
             if response.status_code == 401:
-                messages.error(request, "Server respondend with unauthorized user, user logged out")
+                messages.error(request, "Server responded with unauthorized user, user logged out")
                 return redirect("login")
             else:
                 return JsonResponse(status=response.status_code, data=response_data)

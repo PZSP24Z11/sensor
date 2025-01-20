@@ -112,4 +112,3 @@ void initialize_sensor(void)
         hadError = true;
     }
 }
-

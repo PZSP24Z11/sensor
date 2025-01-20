@@ -99,5 +99,3 @@ void start_mock_measurements_thread(void)
                     mock_measurements_thread_function, NULL, "mock_measurements_thread_function");
     }
 }
-
-
