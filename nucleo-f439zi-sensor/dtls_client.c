@@ -17,6 +17,7 @@
 #include <wolfssl/wolfcrypt/types.h>
 #include "periph/rtc.h"
 #include <time.h>
+#include "xtimer.h"
 
 #define ERR_TIMEOUT -1
 #define ERR_RESPONSE -2
@@ -42,7 +43,6 @@ static uint16_t netif_pid;
 static sock_tls_t tls_socket;
 static sock_tls_t *tls_socket_addr = &tls_socket;
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
-
 
 int decode_utctime(const unsigned char *bytes, size_t len, struct tm *tm_date) {
     int year, month, day, hour, minute, second;
@@ -73,7 +73,6 @@ int decode_utctime(const unsigned char *bytes, size_t len, struct tm *tm_date) {
     return 0;
 }
 
-
 int handle_certs(void) {
     DecodedCert cert;
 	int ret;
@@ -82,7 +81,25 @@ int handle_certs(void) {
 	struct tm tm_rtc;
 	time_t rtc_time_t, before_time_t, after_time_t;
 	char tm_str[50];
-	
+
+    // disable verification of ca cert (will be done manually)
+    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
+
+	LOG(LOG_INFO, "Loading CA cert\n");
+	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
+
+	ret = wolfSSL_CTX_load_verify_buffer(
+            tls_socket_addr->ctx, 
+            ca_der,
+            ca_der_len,
+            SSL_FILETYPE_ASN1);
+    if (ret != SSL_SUCCESS && ret != -150) {
+        LOG(LOG_INFO, "Error loading certificate\n");
+        LOG(LOG_INFO, "Error code: %d\n", ret);
+        return -1;
+    }
+    //wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_PEER, NULL); temporary!
+
 	InitDecodedCert(&cert, ca_der, ca_der_len, NULL);
 	ret = ParseCert(&cert, CERT_TYPE, NO_VERIFY, NULL);
 
@@ -129,22 +146,6 @@ int handle_certs(void) {
     LOG(LOG_INFO, "Certificate is valid!\n");
 
     FreeDecodedCert(&cert);
-    wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
-	LOG(LOG_INFO, "Loading CA cert\n");
-	LOG(LOG_INFO, "CA cert len: %d\n", ca_der_len);
-
-	ret = wolfSSL_CTX_load_verify_buffer(
-            tls_socket_addr->ctx, 
-            ca_der,
-            ca_der_len,
-            SSL_FILETYPE_ASN1);
-    if (ret != SSL_SUCCESS) {
-		LOG(LOG_ERROR, "Error loading CA certificate\n");
-		LOG(LOG_ERROR, "Error code: %d\n", ret);
-		return -1;
-	}
-
-	LOG(LOG_INFO, "CA Certificate Loaded\n");
 
     return 0;
 }
@@ -166,8 +167,6 @@ int dtls_client(char *addr_str)
 {
 	int ret = 0;
 	char *iface;
-	int connect_timeout = 0;
-	const int max_connect_timeouts = 5;
 
 	sock_udp_ep_t local = SOCK_IPV6_EP_ANY;
 	sock_udp_ep_t remote = SOCK_IPV6_EP_ANY;
@@ -196,8 +195,11 @@ int dtls_client(char *addr_str)
 		LOG(LOG_ERROR, "ERROR: Unable to create DTLS sock\n");
 	}
 
-	if (handle_certs() < 0)
+	if (handle_certs() < 0) {
+	    LOG(LOG_ERROR, "Error while processing certificates!\n");
+	    sock_dtls_close(tls_socket_addr);
 		return -1;
+	}
 
 	LOG(LOG_INFO, "Certificates and verification is set up\n");
 
@@ -216,17 +218,22 @@ int dtls_client(char *addr_str)
 			int error_type = wolfSSL_get_error(tls_socket_addr->ssl, ret);
 			if (error_type == SOCKET_ERROR_E) {
 				LOG(LOG_WARNING, "Socket Error: reconnecting...\n");
-				connect_timeout = 0;
 				if (restart_session() < 0)
 					return -1;
 			}
-			if ((error_type == WOLFSSL_ERROR_WANT_READ)
-					&& (connect_timeout++ >= max_connect_timeouts)) {
+			if (error_type == WOLFSSL_ERROR_WANT_READ) {
 				LOG(LOG_WARNING, "Server not responding: reconnecting...\n");
-				connect_timeout = 0;
 				if (restart_session() < 0)
 					return -1;
-			}
+			} else if (error_type == -150){
+                LOG(LOG_INFO, "Before Date invalid, manually checking the dates\n");
+                wolfSSL_CTX_set_verify(tls_socket_addr->ctx, SSL_VERIFY_NONE, NULL);
+                if (restart_session() < 0)
+                    return -1;
+            } else {
+                LOG(LOG_ERROR, "Unknown error occured! %d\n", error_type);
+                return -1;
+            }
 		}
 	} while (ret != SSL_SUCCESS);
 
@@ -341,12 +348,12 @@ int initialize_dtls(char* ip)
 	msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 	wolfSSL_Init();
 	wolfSSL_Debugging_ON();
-	LOG(LOG_INFO, "DTLS Init complete\n");
 
 	if (dtls_client(ip)) {
 		LOG(LOG_ERROR, "ERROR: dtls_client failed, exitting...\n");
 		return -1;
 	}
+	LOG(LOG_INFO, "DTLS Init complete\n");
 
 	if (verify_sensor()) {
 		LOG(LOG_ERROR, "ERROR: Sensor not accepted by host, exitting...\n");

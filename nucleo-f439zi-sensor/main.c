@@ -2,10 +2,15 @@
 #include "ztimer.h"
 #include "log.h"
 
-bool MOCK_MODE = true;
+bool MOCK_MODE = false;
 
 int16_t hum = 0;
 int16_t temp = 0;
+
+bool hadError = false;
+bool isSending = false;
+bool isActive = false;
+bool configured = false;
 
 extern void initialize_sensor(void);
 extern void initialize_lcd(void);
@@ -16,29 +21,39 @@ extern void start_gpio_loop_thread(void);
 
 int start_sensor(int argc, char **argv) {
 
+    if(!MOCK_MODE)
+    {
+        isActive = true;
+        initialize_lcd();
+        initialize_sensor();
+        start_gpio_loop_thread();
+    }
+
 	if (argc != 2) {
 		LOG(LOG_ERROR, "Usage: %s <server address>\n", argv[0]);
+        hadError = true;
+        ztimer_sleep(ZTIMER_MSEC, 1000);
 		return -1;
 	}
 
+
 	if (initialize_dtls(argv[1])) {
 	    LOG(LOG_ERROR, "DTLS initialization failed!\n");
+        hadError = true;
+        ztimer_sleep(ZTIMER_MSEC, 1000);
 	    return -1;
     }
-
+  
+    configured = true;
+    ztimer_sleep(ZTIMER_MSEC, 1000);
+    
     if(MOCK_MODE)
     {
         start_mock_measurements_thread();
-        LOG(LOG_INFO, "Mock measurements initialized\n");
     }
     else
     {
-        initialize_sensor();
-        initialize_lcd();
-        LOG(LOG_INFO, "Sensor and LCD initialized\n");
-
         start_gather_measurements_thread();
-        start_gpio_loop_thread();
     }
 
 	return 0;
@@ -58,3 +73,4 @@ int main(void)
 	shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
     return 0;
 }
+
