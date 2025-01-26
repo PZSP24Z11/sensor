@@ -1,5 +1,5 @@
-MYSQL_USERNAME = "django_user"
-MYSQL_PASSWORD = "djangopassword"
+MYSQL_USERNAME = "djangouser"
+MYSQL_PASSWORD = "1234"
 
 
 def get_credentials() -> tuple[str, str]:

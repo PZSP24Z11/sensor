@@ -44,6 +44,7 @@ def get_latest_pomiary_dict_by_mac(sensor: Sensor) -> str:
 
 def send_anomaly_mail(sensor: Sensor, users: Uzytkownik.objects) -> bool:
     try:
+        print("Sending anomaly email!")
         user_names = [user.email for user in users]
         recepients = ', '.join(user_names)
         msg = _set_message_contents(sensor)

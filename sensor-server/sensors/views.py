@@ -252,8 +252,7 @@ def sensor_register_view(request: HttpRequest) -> HttpResponse:
 
 @method_decorator(csrf_exempt, name="dispatch")
 class MeasurementsRegisterView(View):
-    def __init__(self) -> None:
-        self._anomaly_cooldown = 0
+    anomaly_cooldown = 0
 
     def post(self, request: HttpRequest) -> HttpResponse:
         if request.method == "POST":
@@ -303,11 +302,12 @@ class MeasurementsRegisterView(View):
                     )
                     print(f"average reading: {average_pomiar_value}")
                     print(f"this reading: {float(value)}")
-                    if float(value) >= 1.1 * average_pomiar_value and not self._anomaly_cooldown:
-                        self._anomaly_cooldown = 100
+                    print(f"anomaly cooldown: {self.__class__.anomaly_cooldown}")
+                    if float(value) >= 1.1 * average_pomiar_value and self.__class__.anomaly_cooldown <= 0:
+                        self.__class__.anomaly_cooldown = 100
                         print("ANOMALY DETECTED!")
                         handle_anomaly(sensor)
-                    self._anomaly_cooldown -= 1
+                    self.__class__.anomaly_cooldown -= 1
 
                 return HttpResponse("2")
 
